@@ -5382,9 +5382,9 @@ const PORT = process.env.PORT || 4000;
 
 Promise.all([ensureSchema(), ensureGroupEventsSchema()])
   .then(() => {
-    app.listen(PORT, () =>
-      console.log(`API running on http://localhost:${PORT}`)
-    );
+    app.listen(PORT, () => {
+      console.log(`API running on port ${PORT}`);
+    });
   })
   .catch((e) => {
     console.error("Schema init failed:", e);
