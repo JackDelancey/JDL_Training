@@ -10,3 +10,7 @@ npm run dev
 
 cd jdl-training-mobile
 npx expo start
+
+git add .
+git commit -m "Fix PR logic: use actual weight + show estimated 1RM in feed"
+git push

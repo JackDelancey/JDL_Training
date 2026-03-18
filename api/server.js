@@ -34,7 +34,10 @@ async function supabaseGetUser(accessToken) {
   if (!r.ok) return null;
   return json;
 }
-
+function calcE1RM(weight, reps) {
+  if (!weight || !reps) return null;
+  return Math.round(weight * (1 + reps / 30));
+}
 async function supabaseSignup(email, password, name) {
   const url = `${SUPABASE_URL}/auth/v1/signup`;
   const r = await fetch(url, {
@@ -1849,20 +1852,37 @@ app.put("/api/daily/:date", requireAuth, async (req, res) => {
       });
     }
 
-    for (const c of prCandidates) {
-      const prevBest = await getPreviousBestE1rm(req.user.id, c.exercise, date);
+   // ✅ Step 1: keep only BEST set per exercise
+const bestByExercise = {};
 
-      if (prevBest == null || c.e1rm > prevBest) {
-        await createPrEventsForGroups({
-          userId: req.user.id,
-          exercise: c.exercise,
-          e1rm: c.e1rm,
-          top: c.top,
-          reps: c.reps,
-          date,
-        });
-      }
-    }
+for (const c of prCandidates) {
+  if (!bestByExercise[c.exercise] || c.top > bestByExercise[c.exercise].top) {
+    bestByExercise[c.exercise] = c;
+  }
+}
+
+// ✅ Step 2: run PR logic once per exercise
+for (const c of Object.values(bestByExercise)) {
+  const prev = await db.query(`
+    select max(weight) as best
+    from daily_entries_app
+    where user_id = $1
+      and exercise = $2
+  `, [req.user.id, c.exercise]);
+
+  const prevBestWeight = prev.rows[0]?.best || 0;
+
+  if (c.top > prevBestWeight) {
+    await createPrEventsForGroups({
+      userId: req.user.id,
+      exercise: c.exercise,
+      e1rm: c.e1rm,
+      top: c.top,
+      reps: c.reps,
+      date,
+    });
+  }
+}
     res.json({
       ok: true,
       entry_date: q.rows[0]?.entry_date,

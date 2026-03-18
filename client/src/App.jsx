@@ -21,7 +21,7 @@ ChartJS.register(
   Filler
 );
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API = "https://jdl-training.onrender.com";
 
 async function apiFetch(path, { token, method = "GET", body, onInvalidToken } = {}) {
   const authToken =
@@ -224,10 +224,14 @@ function eventSummaryText(event, unit) {
   const who = event?.user?.name || event?.name || "Someone";
 
   if (type === "pr_e1rm") {
-    return `🔥 ${who} hit a new ${payload.exercise || "lift"} PR — ${
-      payload.e1rm != null ? `${fmt(payload.e1rm)} ${unit}` : "new best"
-    }`;
-  }
+  return `🔥 ${who} hit a new ${payload.exercise || "lift"} PR — ${
+    payload.top != null ? `${fmt(payload.top)} ${unit}` : "new best"
+  }${
+    payload.e1rm != null
+      ? `\nEstimated 1RM: ${fmt(payload.e1rm)} ${unit}`
+      : ""
+  }`;
+}
 
   if (type === "session_completed") {
     return `✅ ${who} completed a session${
@@ -4008,11 +4012,13 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
               }}
               onClick={() => setProgramsOpen(false)}
             >
+            <div className="program-block">
               <div>
                 <h2 style={{ margin: 0 }}>Programs</h2>
                 <div className="small">
                   Build blocks like your spreadsheet. Drafts auto-save locally.
                 </div>
+              </div>
               </div>
               <div style={{ fontWeight: 900 }}>▾</div>
             </div>
@@ -4132,9 +4138,11 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
               }}
               onClick={() => setSummaryOpen(false)}
             >
+              <div className="program-block">
               <div>
                 <h2 style={{ margin: 0 }}>Summary</h2>
                 <div className="small">Active program + quick stats.</div>
+              </div>
               </div>
               <div style={{ fontWeight: 900 }}>▾</div>
             </div>
@@ -4220,7 +4228,7 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
             </button>
           </div>
         ) : null}
-
+      <div className="program-block">
         <div className="card editor-panel">
           <div
             style={{
@@ -4266,6 +4274,7 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
               />
             </>
           )}
+        </div>
         </div>
       </div>
     </div>
@@ -4582,7 +4591,7 @@ function ProgramEditor({
         const isBlockOpen = openBlock === blockIdx;
 
         return (
-          <div key={blockIdx} style={{ marginBottom: 18 }}>
+  <div key={blockIdx} className="program-block">
             <div
               className="blockHeader"
               style={{ cursor: "pointer" }}
@@ -4690,14 +4699,14 @@ function ProgramEditor({
                       </div>
 
                       {isDayOpen ? (
-                        <div style={{ marginTop: 10, overflowX: "auto" }}>
-                          <table className="sheetTable">
+                        <div className="sheet-wrapper">
+  <table className="sheetTable">
                             <thead>
                               <tr>
-                                <th style={{ minWidth: 200 }}>Exercise</th>
-                                <th style={{ minWidth: 120 }}>Sets x Reps</th>
-                                <th style={{ minWidth: 140 }}>Load / RPE</th>
-                                <th style={{ minWidth: 220 }}>Key Notes</th>
+                                <th>Exercise</th>
+<th>Sets x Reps</th>
+<th>Load / RPE</th>
+<th>Notes</th>
                                 {weekKeys.map((wk) => (
                                   <th key={wk} style={{ minWidth: 90 }}>
                                     {wk}

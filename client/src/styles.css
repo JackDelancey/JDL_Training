@@ -17,7 +17,79 @@
   --r: 18px;
   --r2: 14px;
 }
+input, select {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: white;
+  font-size: 13px;
+}
+.day-section {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.day-section {
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.sheet-wrapper {
+  margin-top: 12px;
+  overflow-x: auto;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 10px;
+}
 
+.sheetTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sheetTable th {
+  text-align: left;
+  font-weight: 600;
+  opacity: 0.7;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.sheetTable td {
+  padding: 6px;
+}
+
+.sheetTable tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.sheetTable tr:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.sheetTable input,
+.sheetTable select {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 6px;
+  color: white;
+}
+
+.sheetTable input:focus,
+.sheetTable select:focus {
+  outline: none;
+  border-color: #ff4d4d;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: #ff4d4d;
+  box-shadow: 0 0 0 1px #ff4d4d33;
+}
 *{ box-sizing:border-box; }
 html,body{ height:100%; }
 body{
@@ -237,14 +309,26 @@ input:focus, select:focus, textarea:focus{
 .programs-shell {
   min-width: 0;
 }
-
+.program-block {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(6px);
+}
 .focus-toggles {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
-
+.block-header {
+  display: grid;
+  grid-template-columns: 2fr 2fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
 .programs-layout {
   display: grid;
   grid-template-columns: 320px 320px minmax(0, 1fr);
@@ -252,7 +336,18 @@ input:focus, select:focus, textarea:focus{
   align-items: start;
   min-width: 0;
 }
-
+.exercise-row {
+  display: grid;
+  grid-template-columns: 
+    1.5fr   /* exercise */
+    1fr     /* sets */
+    1fr     /* rpe */
+    2fr     /* notes */
+    repeat(6, 0.7fr); /* weeks */
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
 .programs-layout.editor-focus {
   grid-template-columns: minmax(0, 1fr);
 }
