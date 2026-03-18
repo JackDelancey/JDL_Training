@@ -1,0 +1,12 @@
+Command Prompts
+
+cd jdl-training-mvp/client
+npm i
+npm run dev
+
+cd jdl-training-mvp/api
+npm i
+npm run dev
+
+cd jdl-training-mobile
+npx expo start

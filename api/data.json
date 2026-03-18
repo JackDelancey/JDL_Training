@@ -1,0 +1,86 @@
+{
+  "users": [
+    {
+      "email": "test@test.com",
+      "password_hash": "$2a$10$UzS4iVIdFloR8lfCO06fFekOGK7Vqc.iLaWLlNEL72wIP1d1B35p.",
+      "name": "Jack",
+      "unit_pref": "kg",
+      "created_at": "2026-02-28T00:08:25.417Z"
+    }
+  ],
+  "goals": [],
+  "weekly_entries": [],
+  "tracked_exercises": [
+    {
+      "email": "test@test.com",
+      "name": "Bench",
+      "sort_order": 0,
+      "created_at": "2026-02-28T23:14:07.678Z",
+      "updated_at": "2026-02-28T23:14:07.678Z"
+    },
+    {
+      "email": "test@test.com",
+      "name": "Squat",
+      "sort_order": 1,
+      "created_at": "2026-02-28T23:14:07.678Z",
+      "updated_at": "2026-02-28T23:14:07.678Z"
+    },
+    {
+      "email": "test@test.com",
+      "name": "Deadlift",
+      "sort_order": 2,
+      "created_at": "2026-02-28T23:14:07.678Z",
+      "updated_at": "2026-02-28T23:14:07.678Z"
+    }
+  ],
+  "programs": [
+    {
+      "email": "test@test.com",
+      "programs": [
+        {
+          "id": "MM6WJ10GYH2146",
+          "name": "12 Week Blow Up",
+          "weeks": 12,
+          "days": 4,
+          "blocks": [
+            {
+              "block_number": 1,
+              "title": "Block 1",
+              "intent": "",
+              "rpe_range": "",
+              "days": [
+                {
+                  "day_number": 1,
+                  "title": "Day 1",
+                  "rows": []
+                },
+                {
+                  "day_number": 2,
+                  "title": "Day 2",
+                  "rows": []
+                },
+                {
+                  "day_number": 3,
+                  "title": "Day 3",
+                  "rows": []
+                },
+                {
+                  "day_number": 4,
+                  "title": "Day 4",
+                  "rows": []
+                }
+              ]
+            }
+          ],
+          "created_at": "2026-02-28T22:37:34.048Z",
+          "updated_at": "2026-02-28T22:37:34.048Z"
+        }
+      ],
+      "active_program_id": "MM6WJ10GYH2146",
+      "created_at": "2026-02-28T22:37:34.048Z",
+      "updated_at": "2026-02-28T22:37:34.048Z"
+    }
+  ],
+  "groups": [],
+  "exercise_library": []
+}
