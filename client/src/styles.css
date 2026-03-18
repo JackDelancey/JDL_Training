@@ -389,7 +389,45 @@ input:focus, select:focus, textarea:focus{
     grid-column: 1 / -1;
   }
 }
+.program-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
 
+.program-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.program-card-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-weight: 800;
+  min-width: 0;
+}
+
+.program-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.program-card-actions button {
+  min-width: 96px;
+}
+
+.programs-panel .listRow {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
 .focus-toggles button {
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(30, 30, 35, 0.92);

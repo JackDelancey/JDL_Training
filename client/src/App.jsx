@@ -4004,24 +4004,22 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
         {!editorFocus && programsOpen ? (
           <div className="card programs-panel">
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                cursor: "pointer",
-              }}
-              onClick={() => setProgramsOpen(false)}
-            >
-            <div className="program-block">
-              <div>
-                <h2 style={{ margin: 0 }}>Programs</h2>
-                <div className="small">
-                  Build blocks like your spreadsheet. Drafts auto-save locally.
-                </div>
-              </div>
-              </div>
-              <div style={{ fontWeight: 900 }}>▾</div>
-            </div>
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+  }}
+  onClick={() => setProgramsOpen(false)}
+>
+  <div>
+    <h2 style={{ margin: 0 }}>Programs</h2>
+    <div className="small">
+      Build blocks like your spreadsheet. Drafts auto-save locally.
+    </div>
+  </div>
+  <div style={{ fontWeight: 900 }}>▾</div>
+</div>
 
             <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button onClick={createProgram} disabled={busy}>
@@ -4037,80 +4035,75 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
             <div className="list">
               {(programs || []).length ? (
                 programs.map((p) => (
-                  <div className="listRow" key={p.id} style={{ alignItems: "flex-start" }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div
-                        style={{
-                          fontWeight: 800,
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <span>{p.name}</span>
-                        {activeId === p.id ? <span className="pill">Active</span> : null}
-                        {hasDraft(p.id) ? (
-                          <span className="pill" style={{ borderColor: "#1f3a8a" }}>
-                            Draft
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="small">
-  {p.total_weeks || sumWeeks(p.blocks)} weeks • {p.days_per_week || 4} days/week
-</div>
-<div className="small" style={{ marginTop: 4, opacity: 0.85 }}>
-  Start: <b>{p.start_date || "—"}</b>
-</div>
-<div className="small" style={{ marginTop: 4, opacity: 0.85 }}>
-  Program ID: <b>{p.id}</b>
-</div>
-                    </div>
+                  <div className="program-card" key={p.id}>
+  <div className="program-card-top">
+    <div className="program-card-title">
+      <span>{p.name}</span>
+      {activeId === p.id ? <span className="pill">Active</span> : null}
+      {hasDraft(p.id) ? (
+        <span className="pill" style={{ borderColor: "#1f3a8a" }}>
+          Draft
+        </span>
+      ) : null}
+    </div>
 
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-  <button
-    className="secondary"
-    onClick={() => {
-      setSelectedId(p.id);
-      setEditorFocus(true);
-    }}
-    disabled={busy}
-  >
-    Edit
-  </button>
+    <div className="program-card-actions">
+      <button
+        className="secondary"
+        onClick={() => {
+          setSelectedId(p.id);
+          setEditorFocus(true);
+        }}
+        disabled={busy}
+      >
+        Edit
+      </button>
 
-  <button
-    className="secondary"
-    onClick={async () => {
-      try {
-        await navigator.clipboard.writeText(p.id);
-        alert("Program ID copied");
-      } catch {
-        alert(`Program ID: ${p.id}`);
-      }
-    }}
-    disabled={busy}
-  >
-    Copy ID
-  </button>
+      <button
+        className="secondary"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(p.id);
+            alert("Program ID copied");
+          } catch {
+            alert(`Program ID: ${p.id}`);
+          }
+        }}
+        disabled={busy}
+      >
+        Copy ID
+      </button>
 
-  <button
-    className="secondary"
-    onClick={() => activate(p.id)}
-    disabled={busy || activeId === p.id}
-  >
-    Set active
-  </button>
+      <button
+        className="secondary"
+        onClick={() => activate(p.id)}
+        disabled={busy || activeId === p.id}
+      >
+        Set active
+      </button>
 
-  <button
-    className="secondary"
-    onClick={() => removeProgram(p.id)}
-    disabled={busy}
-  >
-    Delete
-  </button>
+      <button
+        className="secondary"
+        onClick={() => removeProgram(p.id)}
+        disabled={busy}
+      >
+        Delete
+      </button>
+    </div>
+  </div>
+
+  <div className="small" style={{ marginTop: 10 }}>
+    {p.total_weeks || sumWeeks(p.blocks)} weeks • {p.days_per_week || 4} days/week
+  </div>
+
+  <div className="small" style={{ marginTop: 4, opacity: 0.85 }}>
+    Start: <b>{p.start_date ? formatPrettyDate(p.start_date) : "—"}</b>
+  </div>
+
+  <div className="small" style={{ marginTop: 4, opacity: 0.85, wordBreak: "break-all" }}>
+    Program ID: <b>{p.id}</b>
+  </div>
 </div>
-                  </div>
                 ))
               ) : (
                 <div className="small">No programs yet — create one.</div>
@@ -4130,22 +4123,20 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
         {!editorFocus && summaryOpen ? (
           <div className="card summary-panel">
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                cursor: "pointer",
-              }}
-              onClick={() => setSummaryOpen(false)}
-            >
-              <div className="program-block">
-              <div>
-                <h2 style={{ margin: 0 }}>Summary</h2>
-                <div className="small">Active program + quick stats.</div>
-              </div>
-              </div>
-              <div style={{ fontWeight: 900 }}>▾</div>
-            </div>
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    cursor: "pointer",
+  }}
+  onClick={() => setSummaryOpen(false)}
+>
+  <div>
+    <h2 style={{ margin: 0 }}>Summary</h2>
+    <div className="small">Active program + quick stats.</div>
+  </div>
+  <div style={{ fontWeight: 900 }}>▾</div>
+</div>
 
             <div style={{ height: 12 }} />
 
@@ -4157,8 +4148,8 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
                   {(active.blocks || []).length} blocks
                 </div>
                 <div className="small" style={{ marginTop: 4 }}>
-                  Start date: <b>{active.start_date || "—"}</b>
-                </div>
+  Start date: <b>{active.start_date ? formatPrettyDate(active.start_date) : "—"}</b>
+</div>
                 <div className="small" style={{ marginTop: 4 }}>
   Program ID: <b>{active.id}</b>
 </div>
@@ -4228,7 +4219,6 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
             </button>
           </div>
         ) : null}
-      <div className="program-block">
         <div className="card editor-panel">
           <div
             style={{
@@ -4277,7 +4267,6 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
         </div>
         </div>
       </div>
-    </div>
   );
 }
 
