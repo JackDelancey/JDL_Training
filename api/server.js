@@ -790,6 +790,7 @@ app.get("/api/me", requireAuth, async (req, res) => {
     const q = await pool.query(
       `select id, email, name,
               coalesce(unit_pref, units, 'kg') as unit_pref,
+              coalesce(use_rpe, true) as use_rpe,
               exercise_library,
               tracked_exercises,
               dashboard_exercises,
@@ -804,7 +805,22 @@ app.get("/api/me", requireAuth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+app.patch("/api/me/preferences", requireAuth, async (req, res) => {
+  try {
+    const useRpe = req.body?.use_rpe !== false;
 
+    await pool.query(
+      `update public.app_users
+       set use_rpe = $1
+       where id = $2`,
+      [useRpe, req.user.id]
+    );
+
+    res.json({ ok: true, use_rpe: useRpe });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
 app.patch("/api/me/unit", requireAuth, async (req, res) => {
   try {
     const unit = (req.body?.unit_pref || req.body?.unit || "kg").toString();
@@ -1858,7 +1874,7 @@ app.put("/api/daily/:date", requireAuth, async (req, res) => {
       const exercise = String(e?.exercise || "").trim();
       if (!exercise) continue;
 
-      const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+      const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
       const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
       const e1rm = e1rmEpley(top, reps);
 
@@ -2641,7 +2657,7 @@ app.get("/api/exercises/explorer", requireAuth, async (req, res) => {
       for (const e of entries) {
         if (!matchesExerciseName(e?.exercise)) continue;
 
-        const top = parseLoadNumber(e?.top ?? e?.actual?.top);
+        const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
         const reps = parseLoadNumber(e?.reps ?? e?.actual?.reps);
         const rpe = e?.rpe ?? e?.actual?.rpe ?? null;
 
@@ -2931,7 +2947,7 @@ app.get("/api/exercises/stats", requireAuth, async (req, res) => {
         const ex = String(e?.exercise || "").trim();
         if (ex.toLowerCase() !== name.toLowerCase()) continue;
 
-        const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+        const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
         const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
         const rpe = e?.actual?.rpe ?? e?.rpe ?? null;
 
@@ -3003,7 +3019,7 @@ app.post("/api/exercises/history/batch", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== target) continue;
 
-          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const rpe = e?.actual?.rpe ?? e?.rpe ?? null;
           const e1rm = e1rmEpley(top, reps);
@@ -3296,7 +3312,7 @@ async function getPreviousBestE1rm(userId, exercise, excludeDate = null) {
     for (const e of entries) {
       if (normalizeExerciseName(e?.exercise) !== norm) continue;
 
-      const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+      const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
       const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
       const val = e1rmEpley(top, reps);
 
@@ -3317,7 +3333,7 @@ async function getPreviousBestE1rm(userId, exercise, excludeDate = null) {
     for (const e of entries) {
       if (normalizeExerciseName(e?.exercise) !== norm) continue;
 
-      const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+      const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
       const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
       const val = e1rmEpley(top, reps);
 
@@ -3444,13 +3460,13 @@ async function getGroupMemberIds(groupId) {
 }
 
 function computeE1rmFromEntry(e) {
-  const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+  const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
   const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
   return e1rmEpley(top, reps);
 }
 
 function sumVolumeFromEntry(e) {
-  const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+  const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
   const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
   if (!Number.isFinite(top) || !Number.isFinite(reps)) return null;
   return top * reps;
@@ -3946,7 +3962,7 @@ app.get("/api/groups/:id/challenges/:challengeId/leaderboard", requireAuth, asyn
           const entries = Array.isArray(row.entries) ? row.entries : [];
           for (const e of entries) {
             if (challenge.exercise && normalizeExerciseName(e?.exercise) !== exNorm) continue;
-            const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+            const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
             const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
             const score = e1rmEpley(top, reps);
             if (!Number.isFinite(score)) continue;
@@ -4052,7 +4068,7 @@ app.get("/api/groups/:id/compare", requireAuth, async (req, res) => {
         let bestForDay = null;
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
-          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const e1rm = e1rmEpley(top, reps);
           if (!Number.isFinite(e1rm)) continue;
@@ -4161,7 +4177,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const val = e1rmEpley(top, reps);
 
@@ -4187,7 +4203,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseLoadNumber(e?.top ?? e?.actual?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.reps ?? e?.actual?.reps);
           const val = e1rmEpley(top, reps);
 
@@ -4218,7 +4234,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
 
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
-          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const val = e1rmEpley(top, reps);
           if (Number.isFinite(val)) {
@@ -4251,7 +4267,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         const entries = Array.isArray(row.entries) ? row.entries : [];
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
-          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const e1 = e1rmEpley(top, reps);
           if (!Number.isFinite(e1)) continue;
@@ -4443,7 +4459,7 @@ function buildMetricRowsFromEntries(entries) {
     const exercise = String(e?.exercise || "").trim();
     if (!exercise) continue;
 
-    const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+    const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
     const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
     const rpe = e?.actual?.rpe ?? e?.rpe ?? null;
     const e1rm = e1rmEpley(top, reps);
@@ -4830,7 +4846,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const val = e1rmEpley(top, reps);
           if (!Number.isFinite(val)) continue;
@@ -4856,7 +4872,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseLoadNumber(e?.top ?? e?.actual?.top);
+          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
           const reps = parseLoadNumber(e?.reps ?? e?.actual?.reps);
           const val = e1rmEpley(top, reps);
           if (!Number.isFinite(val)) continue;
