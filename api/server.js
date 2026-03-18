@@ -101,7 +101,27 @@ function toNum(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+function parseTrainingLoad(value, bodyweight) {
+  const raw = String(value || "").trim().toUpperCase();
+  const bw = Number(bodyweight);
 
+  if (!raw) return null;
+
+  if (/^BW\s*\+\s*-?\d+(\.\d+)?$/.test(raw)) {
+    const extra = Number(raw.replace(/^BW\s*\+\s*/, ""));
+    if (!Number.isFinite(bw)) return null;
+    return bw + extra;
+  }
+
+  if (/^-?\d+(\.\d+)?\s*\+\s*-?\d+(\.\d+)?$/.test(raw)) {
+    const [a, b] = raw.split("+").map((x) => Number(x.trim()));
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+    return a + b;
+  }
+
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 function parseLoadNumber(v) {
   if (v == null) return null;
   const s = String(v).trim();

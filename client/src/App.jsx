@@ -179,7 +179,13 @@ function draftKey(programId) {
 function hasDraft(programId) {
   return !!localStorage.getItem(draftKey(programId));
 }
+function dailyDraftKey(date) {
+  return `jdl_daily_draft_${date}`;
+}
 
+function hasDailyDraft(date) {
+  return !!localStorage.getItem(dailyDraftKey(date));
+}
 function timeAgo(date) {
   const ts = new Date(date).getTime();
   if (!Number.isFinite(ts)) return "—";
@@ -502,12 +508,13 @@ export default function App() {
           />
         ) : page === "daily" ? (
           <DailyPage
-            token={token}
-            unit={unit}
-            library={mergedLibrary}
-            onInvalidToken={() => hardLogout("Session expired — please log in again.")}
-            onError={setErr}
-          />
+  me={me}
+  token={token}
+  unit={unit}
+  library={mergedLibrary}
+  onInvalidToken={() => hardLogout("Session expired — please log in again.")}
+  onError={setErr}
+/>
         ) : page === "explorer" ? (
           <ExplorerPage
             token={token}
@@ -2875,7 +2882,28 @@ function SettingsPage({
             <option value="lb">lb</option>
           </select>
         </div>
-
+            <div className="field" style={{ marginTop: 12 }}>
+  <label>RPE input</label>
+  <select
+    value={me?.use_rpe === false ? "off" : "on"}
+    onChange={async (e) => {
+      try {
+        await apiFetch("/api/me/preferences", {
+          token,
+          method: "PATCH",
+          body: { use_rpe: e.target.value === "on" },
+          onInvalidToken,
+        });
+        onRefresh();
+      } catch (ex) {
+        onError(ex.message);
+      }
+    }}
+  >
+    <option value="on">Show RPE</option>
+    <option value="off">Hide RPE</option>
+  </select>
+</div>
         <div style={{ height: 14 }} />
         <div className="small">
           Signed in as <b>{me?.name || me?.email}</b>
@@ -2928,7 +2956,7 @@ function SettingsPage({
 /* =====================
    Daily Page
 ===================== */
-function DailyPage({ token, unit, library, onInvalidToken, onError }) {
+function DailyPage({ me, token, unit, library, onInvalidToken, onError }) {
   const [date, setDate] = useState(isoLocalToday());
   const [plan, setPlan] = useState(null);
   const [day, setDay] = useState(null);
@@ -2939,10 +2967,12 @@ function DailyPage({ token, unit, library, onInvalidToken, onError }) {
   const [selectedProgramSlot, setSelectedProgramSlot] = useState("");
   const [exerciseHistory, setExerciseHistory] = useState({});
   const plannedCt = (day?.entries || []).length;
+  const showRpe = me?.use_rpe !== false;
   const doneCt = (day?.entries || []).filter(
     (e) => e?.completed || String(e?.actual?.top || "").trim() !== ""
   ).length;
-  
+  const [dailyDraftNotice, setDailyDraftNotice] = useState(false);
+const [dailyDraftHydrated, setDailyDraftHydrated] = useState(false);
   function normalizeDateOnly(v) {
     return String(v || "").slice(0, 10);
   }
@@ -3090,9 +3120,39 @@ if (!selectedProgramSlot && p?.block_number && p?.block_week && p?.day_number) {
   }
 }
   useEffect(() => {
-    loadAll(date);
-  }, [date]);
+  async function loadWithDraft() {
+    await loadAll(date);
 
+    const raw = localStorage.getItem(dailyDraftKey(date));
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.entry_date === date) {
+          setDay(parsed);
+          setDailyDraftNotice(true);
+        }
+      } catch {}
+    }
+
+    setDailyDraftHydrated(true);
+  }
+
+  loadWithDraft();
+}, [date]);
+useEffect(() => {
+  if (!dailyDraftHydrated) return;
+  if (!day || !date) return;
+
+  try {
+    localStorage.setItem(
+      dailyDraftKey(date),
+      JSON.stringify({
+        ...day,
+        entry_date: date,
+      })
+    );
+  } catch {}
+}, [day, date, dailyDraftHydrated]);
   useEffect(() => {
     setManualPick("");
   }, [date]);
@@ -3181,21 +3241,26 @@ if (!selectedProgramSlot && p?.block_number && p?.block_week && p?.day_number) {
   }
 
   async function saveDay(nextDay) {
-    try {
-      setBusy(true);
-      await apiFetch(`/api/daily/${date}`, {
-        token,
-        method: "PUT",
-        body: nextDay,
-        onInvalidToken,
-      });
-      await loadAll(date);
-    } catch (e) {
-      onError(e.message);
-    } finally {
-      setBusy(false);
-    }
+  try {
+    setBusy(true);
+
+    await apiFetch(`/api/daily/${date}`, {
+      token,
+      method: "PUT",
+      body: nextDay,
+      onInvalidToken,
+    });
+
+    localStorage.removeItem(dailyDraftKey(date));
+    setDailyDraftNotice(false);
+
+    await loadAll(date);
+  } catch (e) {
+    onError(e.message);
+  } finally {
+    setBusy(false);
   }
+}
 
   function setEntry(idx, patch) {
     const entries = [...(day?.entries || [])];
@@ -3361,11 +3426,28 @@ if (!selectedProgramSlot && p?.block_number && p?.block_week && p?.day_number) {
             </button>
           </div>
         </div>
-
+          
         <div className="card">
           <h2>Log</h2>
           <div className="small">Today’s entries (planned + actual).</div>
-
+                {dailyDraftNotice ? (
+  <Notice
+    text="Draft restored — your day log is being auto-saved locally until you click Save day."
+    onDismiss={() => setDailyDraftNotice(false)}
+    actions={
+      <button
+        className="secondary"
+        onClick={() => {
+          localStorage.removeItem(dailyDraftKey(date));
+          setDailyDraftNotice(false);
+          loadAll(date);
+        }}
+      >
+        Discard draft
+      </button>
+    }
+  />
+) : null}
           <div style={{ height: 10 }} />
 
           {!day ? (
@@ -3489,7 +3571,7 @@ if (!selectedProgramSlot && p?.block_number && p?.block_week && p?.day_number) {
                           />
                         </div>
 
-                        <div className="grid grid-3" style={{ marginTop: 10 }}>
+                        <div className={showRpe ? "grid grid-3" : "grid grid-2"} style={{ marginTop: 10 }}>
                           <div className="field">
                             <label>Top ({unit})</label>
                             <input
@@ -3504,13 +3586,15 @@ if (!selectedProgramSlot && p?.block_number && p?.block_week && p?.day_number) {
                               onChange={(ev) => setActual(idx, { reps: ev.target.value })}
                             />
                           </div>
-                          <div className="field">
-                            <label>RPE</label>
-                            <input
-                              value={e?.actual?.rpe ?? ""}
-                              onChange={(ev) => setActual(idx, { rpe: ev.target.value })}
-                            />
-                          </div>
+                          {showRpe ? (
+  <div className="field">
+    <label>RPE</label>
+    <input
+      value={e?.actual?.rpe ?? ""}
+      onChange={(ev) => setActual(idx, { rpe: ev.target.value })}
+    />
+  </div>
+) : null}
                         </div>
                       </div>
                     </div>
