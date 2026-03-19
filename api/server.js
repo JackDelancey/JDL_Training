@@ -2657,7 +2657,7 @@ app.get("/api/exercises/explorer", requireAuth, async (req, res) => {
       for (const e of entries) {
         if (!matchesExerciseName(e?.exercise)) continue;
 
-        const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+        const top = parseLoadNumber(e?.actual?.top ?? e?.top);
         const reps = parseLoadNumber(e?.reps ?? e?.actual?.reps);
         const rpe = e?.rpe ?? e?.actual?.rpe ?? null;
 
