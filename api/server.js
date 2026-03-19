@@ -5380,13 +5380,18 @@ app.get("/api/groups/:id/compare", requireAuth, async (req, res) => {
 ===================== */
 const PORT = process.env.PORT || 4000;
 
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
+});
+
 Promise.all([ensureSchema(), ensureGroupEventsSchema()])
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`API running on port ${PORT}`);
-    });
+    console.log("Schema init complete");
   })
   .catch((e) => {
     console.error("Schema init failed:", e);
-    process.exit(1);
   });
