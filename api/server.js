@@ -4177,7 +4177,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const val = e1rmEpley(top, reps);
 
