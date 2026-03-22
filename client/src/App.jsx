@@ -4421,16 +4421,32 @@ function ProgramScheduleEditor({ program, busy, onSave }) {
               const active = trainingDays.includes(d.n);
               return (
                 <button
-                  key={d.n}
-                  type="button"
-                  className={active ? "" : "secondary"}
-                  onClick={() => toggleDay(d.n)}
-                  disabled={busy}
-                >
-                  {d.label}
-                </button>
+  key={d.n}
+  type="button"
+  className={active ? "day-chip active" : "day-chip"}
+  onClick={() => toggleDay(d.n)}
+  disabled={busy}
+>
+  {d.label}
+</button>
+
               );
             })}
+            <div className="small" style={{ marginTop: 8, opacity: 0.85 }}>
+  Selected:{!trainingDays.length ? (
+  <div className="small" style={{ marginTop: 6, color: "#fca5a5" }}>
+    Pick at least one training day before saving.
+  </div>
+) : null}
+  <b>
+    {trainingDays.length
+      ? dayLabels
+          .filter((d) => trainingDays.includes(d.n))
+          .map((d) => d.label)
+          .join(", ")
+      : "None"}
+  </b>
+</div>
           </div>
         </div>
       </div>
