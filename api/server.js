@@ -3962,7 +3962,7 @@ app.get("/api/groups/:id/challenges/:challengeId/leaderboard", requireAuth, asyn
           const entries = Array.isArray(row.entries) ? row.entries : [];
           for (const e of entries) {
             if (challenge.exercise && normalizeExerciseName(e?.exercise) !== exNorm) continue;
-            const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+            const top = parseLoadNumber(e?.actual?.top ?? e?.top);
             const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
             const score = e1rmEpley(top, reps);
             if (!Number.isFinite(score)) continue;
@@ -4068,7 +4068,7 @@ app.get("/api/groups/:id/compare", requireAuth, async (req, res) => {
         let bestForDay = null;
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const e1rm = e1rmEpley(top, reps);
           if (!Number.isFinite(e1rm)) continue;
@@ -4203,7 +4203,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.reps ?? e?.actual?.reps);
           const val = e1rmEpley(top, reps);
 
@@ -4234,7 +4234,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
 
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const val = e1rmEpley(top, reps);
           if (Number.isFinite(val)) {
@@ -4267,7 +4267,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         const entries = Array.isArray(row.entries) ? row.entries : [];
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const e1 = e1rmEpley(top, reps);
           if (!Number.isFinite(e1)) continue;
@@ -4459,7 +4459,7 @@ function buildMetricRowsFromEntries(entries) {
     const exercise = String(e?.exercise || "").trim();
     if (!exercise) continue;
 
-    const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+    const top = parseLoadNumber(e?.actual?.top ?? e?.top);
     const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
     const rpe = e?.actual?.rpe ?? e?.rpe ?? null;
     const e1rm = e1rmEpley(top, reps);
@@ -4846,7 +4846,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
           const val = e1rmEpley(top, reps);
           if (!Number.isFinite(val)) continue;
@@ -4872,7 +4872,7 @@ app.get("/api/groups/:id/leaderboard", requireAuth, async (req, res) => {
         for (const e of entries) {
           if (normalizeExerciseName(e?.exercise) !== exNorm) continue;
 
-          const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+          const top = parseLoadNumber(e?.actual?.top ?? e?.top);
           const reps = parseLoadNumber(e?.reps ?? e?.actual?.reps);
           const val = e1rmEpley(top, reps);
           if (!Number.isFinite(val)) continue;
