@@ -456,6 +456,171 @@ input:focus, select:focus, textarea:focus{
   padding: 10px 14px;
   cursor: pointer;
 }
+.connections-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.connection-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 14px 16px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.connection-card:hover {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.connection-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.connection-name {
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.connection-meta {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.connection-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.connection-actions button {
+  min-width: 92px;
+}
+
+.connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.connection-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.connection-pill.friend {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.connection-pill.coach {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: rgba(239, 68, 68, 0.14);
+}
+
+.connection-pill.client {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.connection-pill.pending {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.share-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+
+.share-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.share-card-title {
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.share-card-meta {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.share-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.share-picker {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.share-picker .field {
+  margin-bottom: 0;
+}
+
+.connection-empty {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .connection-top,
+  .share-card-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .connection-actions,
+  .share-card-actions {
+    width: 100%;
+  }
+
+  .connection-actions button,
+  .share-card-actions button {
+    flex: 1 1 auto;
+  }
+}
 /* v6.3: hide any legacy top header/tabs if still present from older markup */
 .header, .tabs, .app > .header { display:none !important; }
 

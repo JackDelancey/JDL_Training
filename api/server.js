@@ -5397,6 +5397,373 @@ app.get("/api/groups/:id/compare", requireAuth, async (req, res) => {
   }
 });
 /* =====================
+   Friends
+===================== */
+app.get("/api/connections/search", requireAuth, async (req, res) => {
+  try {
+    const q = String(req.query?.q || "").trim();
+    if (!q || q.length < 2) {
+      return res.json({ users: [] });
+    }
+
+    const r = await pool.query(
+      `select id, email, name, created_at
+       from public.app_users
+       where id <> $1
+         and (
+           lower(email) like lower($2)
+           or lower(coalesce(name, '')) like lower($2)
+         )
+       order by created_at desc
+       limit 20`,
+      [req.user.id, `%${q}%`]
+    );
+
+    res.json({ users: r.rows || [] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/connections/request", requireAuth, async (req, res) => {
+  try {
+    const targetUserId = String(req.body?.target_user_id || "").trim();
+    const relationshipType = normalizeRelationshipType(req.body?.relationship_type);
+
+    if (!targetUserId) {
+      return res.status(400).json({ error: "target_user_id is required" });
+    }
+
+    if (targetUserId === req.user.id) {
+      return res.status(400).json({ error: "You cannot connect to yourself" });
+    }
+
+    const existing = await pool.query(
+      `select id, status
+       from public.user_connections
+       where least(requester_user_id, target_user_id) = least($1, $2)
+         and greatest(requester_user_id, target_user_id) = greatest($1, $2)
+         and relationship_type = $3
+       limit 1`,
+      [req.user.id, targetUserId, relationshipType]
+    );
+
+    if (existing.rows[0]) {
+      return res.json({ ok: true, connection: existing.rows[0], already_exists: true });
+    }
+
+    const ins = await pool.query(
+      `insert into public.user_connections (
+         requester_user_id,
+         target_user_id,
+         relationship_type,
+         status
+       )
+       values ($1, $2, $3, 'pending')
+       returning *`,
+      [req.user.id, targetUserId, relationshipType]
+    );
+
+    res.json({ ok: true, connection: ins.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.get("/api/connections", requireAuth, async (req, res) => {
+  try {
+    const acceptedQ = await pool.query(
+      `select
+         c.id,
+         c.relationship_type,
+         c.status,
+         c.created_at,
+         c.accepted_at,
+         case
+           when c.requester_user_id = $1 then u2.id
+           else u1.id
+         end as other_user_id,
+         case
+           when c.requester_user_id = $1 then u2.email
+           else u1.email
+         end as other_email,
+         case
+           when c.requester_user_id = $1 then u2.name
+           else u1.name
+         end as other_name,
+         case
+           when c.requester_user_id = $1 then 'outgoing'
+           else 'incoming'
+         end as direction
+       from public.user_connections c
+       join public.app_users u1 on u1.id = c.requester_user_id
+       join public.app_users u2 on u2.id = c.target_user_id
+       where (c.requester_user_id = $1 or c.target_user_id = $1)
+         and c.status = 'accepted'
+       order by coalesce(c.accepted_at, c.created_at) desc`,
+      [req.user.id]
+    );
+
+    const pendingQ = await pool.query(
+      `select
+         c.id,
+         c.relationship_type,
+         c.status,
+         c.created_at,
+         u.id as other_user_id,
+         u.email as other_email,
+         u.name as other_name,
+         case
+           when c.requester_user_id = $1 then 'outgoing'
+           else 'incoming'
+         end as direction
+       from public.user_connections c
+       join public.app_users u
+         on u.id = case
+           when c.requester_user_id = $1 then c.target_user_id
+           else c.requester_user_id
+         end
+       where (c.requester_user_id = $1 or c.target_user_id = $1)
+         and c.status = 'pending'
+       order by c.created_at desc`,
+      [req.user.id]
+    );
+
+    res.json({
+      accepted: acceptedQ.rows || [],
+      pending: pendingQ.rows || [],
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/connections/:id/accept", requireAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+
+    const upd = await pool.query(
+      `update public.user_connections
+       set status = 'accepted',
+           accepted_at = now()
+       where id = $1
+         and target_user_id = $2
+         and status = 'pending'
+       returning *`,
+      [id, req.user.id]
+    );
+
+    if (!upd.rows[0]) {
+      return res.status(404).json({ error: "Pending request not found" });
+    }
+
+    res.json({ ok: true, connection: upd.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/connections/:id/decline", requireAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id || "").trim();
+
+    const upd = await pool.query(
+      `update public.user_connections
+       set status = 'declined'
+       where id = $1
+         and target_user_id = $2
+         and status = 'pending'
+       returning *`,
+      [id, req.user.id]
+    );
+
+    if (!upd.rows[0]) {
+      return res.status(404).json({ error: "Pending request not found" });
+    }
+
+    res.json({ ok: true, connection: upd.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/programs/:id/share-to-connection", requireAuth, async (req, res) => {
+  try {
+    const programId = String(req.params.id || "").trim();
+    const connectionId = String(req.body?.connection_id || "").trim();
+    const message = String(req.body?.message || "").trim() || null;
+
+    if (!connectionId) {
+      return res.status(400).json({ error: "connection_id is required" });
+    }
+
+    const programQ = await pool.query(
+      `select id, user_id, name
+       from public.programs_app
+       where id = $1
+         and user_id = $2
+       limit 1`,
+      [programId, req.user.id]
+    );
+
+    const program = programQ.rows[0];
+    if (!program) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const connQ = await pool.query(
+      `select *
+       from public.user_connections
+       where id = $1
+         and status = 'accepted'
+         and (requester_user_id = $2 or target_user_id = $2)
+       limit 1`,
+      [connectionId, req.user.id]
+    );
+
+    const conn = connQ.rows[0];
+    if (!conn) {
+      return res.status(404).json({ error: "Accepted connection not found" });
+    }
+
+    const targetUserId =
+      conn.requester_user_id === req.user.id ? conn.target_user_id : conn.requester_user_id;
+
+    const ins = await pool.query(
+      `insert into public.program_shares_app (
+         program_id,
+         shared_by_user_id,
+         shared_to_user_id,
+         relationship_type,
+         message,
+         status
+       )
+       values ($1, $2, $3, $4, $5, 'pending')
+       returning *`,
+      [programId, req.user.id, targetUserId, conn.relationship_type, message]
+    );
+
+    res.json({ ok: true, share: ins.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/programs/:id/share-to-connection", requireAuth, async (req, res) => {
+  try {
+    const programId = String(req.params.id || "").trim();
+    const connectionId = String(req.body?.connection_id || "").trim();
+    const message = String(req.body?.message || "").trim() || null;
+
+    if (!connectionId) {
+      return res.status(400).json({ error: "connection_id is required" });
+    }
+
+    const programQ = await pool.query(
+      `select id, user_id, name
+       from public.programs_app
+       where id = $1
+         and user_id = $2
+       limit 1`,
+      [programId, req.user.id]
+    );
+
+    const program = programQ.rows[0];
+    if (!program) {
+      return res.status(404).json({ error: "Program not found" });
+    }
+
+    const connQ = await pool.query(
+      `select *
+       from public.user_connections
+       where id = $1
+         and status = 'accepted'
+         and (requester_user_id = $2 or target_user_id = $2)
+       limit 1`,
+      [connectionId, req.user.id]
+    );
+
+    const conn = connQ.rows[0];
+    if (!conn) {
+      return res.status(404).json({ error: "Accepted connection not found" });
+    }
+
+    const targetUserId =
+      conn.requester_user_id === req.user.id ? conn.target_user_id : conn.requester_user_id;
+
+    const ins = await pool.query(
+      `insert into public.program_shares_app (
+         program_id,
+         shared_by_user_id,
+         shared_to_user_id,
+         relationship_type,
+         message,
+         status
+       )
+       values ($1, $2, $3, $4, $5, 'pending')
+       returning *`,
+      [programId, req.user.id, targetUserId, conn.relationship_type, message]
+    );
+
+    res.json({ ok: true, share: ins.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/program-shares/:id/copy", requireAuth, async (req, res) => {
+  try {
+    const shareId = String(req.params.id || "").trim();
+
+    const shareQ = await pool.query(
+      `select s.*, p.*
+       from public.program_shares_app s
+       join public.programs_app p on p.id = s.program_id
+       where s.id = $1
+         and s.shared_to_user_id = $2
+       limit 1`,
+      [shareId, req.user.id]
+    );
+
+    const row = shareQ.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: "Shared program not found" });
+    }
+
+    const clone = cloneProgramForUser(row, req.user.id);
+
+    const ins = await pool.query(
+      `insert into public.programs_app (
+         user_id,
+         name,
+         days_per_week,
+         total_weeks,
+         blocks,
+         start_date,
+         training_days,
+         created_at
+       )
+       values ($1, $2, $3, $4, $5, $6, $7, now())
+       returning *`,
+      [
+        clone.user_id,
+        clone.name,
+        clone.days_per_week,
+        clone.total_weeks,
+        JSON.stringify(clone.blocks),
+        clone.start_date,
+        clone.training_days,
+      ]
+    );
+
+    await pool.query(
+      `update public.program_shares_app
+       set status = 'copied',
+           copied_at = now(),
+           accepted_at = coalesce(accepted_at, now())
+       where id = $1`,
+      [shareId]
+    );
+
+    res.json({ ok: true, program: ins.rows[0] });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+/* =====================
    Boot
 ===================== */
 const PORT = process.env.PORT || 4000;
