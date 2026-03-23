@@ -4202,6 +4202,39 @@ async function copyIncomingShare(shareId) {
     </select>
   </div>
 </div>
+<div style={{ height: 16 }} />
+<div className="card" style={{ background: "rgba(255,255,255,0.03)" }}>
+  <h3 style={{ marginTop: 0 }}>Shared with me</h3>
+
+  {incomingShares.length ? (
+    <div className="list">
+      {incomingShares.map((s) => (
+        <div className="listRow" key={s.id} style={{ alignItems: "flex-start" }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontWeight: 800 }}>{s.program_name || "Shared program"}</div>
+            <div className="small">
+              From <b>{s.shared_by_name || s.shared_by_email || "—"}</b>
+            </div>
+            <div className="small">
+              {s.total_weeks || 0} weeks • {s.days_per_week || 4} days/week
+            </div>
+            <div className="small">Status: <b>{s.status}</b></div>
+          </div>
+
+          <button
+            className="secondary"
+            onClick={() => copyIncomingShare(s.id)}
+            disabled={busy || s.status === "copied"}
+          >
+            {s.status === "copied" ? "Copied" : "Copy to my programs"}
+          </button>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="small">No incoming shared programs.</div>
+  )}
+</div>
             <div style={{ height: 14 }} />
 
             <div className="list">
@@ -4310,39 +4343,7 @@ async function copyIncomingShare(shareId) {
   }}
   onClick={() => setSummaryOpen(false)}
 >
-  <div style={{ height: 16 }} />
-<div className="card" style={{ background: "rgba(255,255,255,0.03)" }}>
-  <h3 style={{ marginTop: 0 }}>Shared with me</h3>
-
-  {incomingShares.length ? (
-    <div className="list">
-      {incomingShares.map((s) => (
-        <div className="listRow" key={s.id} style={{ alignItems: "flex-start" }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontWeight: 800 }}>{s.program_name || "Shared program"}</div>
-            <div className="small">
-              From <b>{s.shared_by_name || s.shared_by_email || "—"}</b>
-            </div>
-            <div className="small">
-              {s.total_weeks || 0} weeks • {s.days_per_week || 4} days/week
-            </div>
-            <div className="small">Status: <b>{s.status}</b></div>
-          </div>
-
-          <button
-            className="secondary"
-            onClick={() => copyIncomingShare(s.id)}
-            disabled={busy || s.status === "copied"}
-          >
-            {s.status === "copied" ? "Copied" : "Copy to my programs"}
-          </button>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div className="small">No incoming shared programs.</div>
-  )}
-</div>
+  
   <div>
     <h2 style={{ margin: 0 }}>Summary</h2>
     <div className="small">Active program + quick stats.</div>
