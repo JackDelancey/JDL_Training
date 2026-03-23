@@ -1899,7 +1899,7 @@ for (const c of prCandidates) {
 
 // ✅ Step 2: run PR logic once per exercise
 for (const c of Object.values(bestByExercise)) {
-  const prev = await db.query(`
+  const prev = await pool.query(`
     select max(weight) as best
     from daily_entries_app
     where user_id = $1
