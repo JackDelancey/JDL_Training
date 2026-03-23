@@ -460,6 +460,12 @@ export default function App() {
               Explorer
             </button>
             <button
+  className={page === "connections" ? "navBtn active" : "navBtn"}
+  onClick={() => setPage("connections")}
+>
+  Connections
+</button>
+            <button
               className={page === "groups" ? "navBtn active" : "navBtn"}
               onClick={() => setPage("groups")}
             >
@@ -531,6 +537,12 @@ export default function App() {
             onInvalidToken={() => hardLogout("Session expired — please log in again.")}
             onError={setErr}
           />
+          ) : page === "connections" ? (
+  <ConnectionsPage
+    token={token}
+    onInvalidToken={() => hardLogout("Session expired — please log in again.")}
+    onError={setErr}
+  />
         ) : page === "groups" ? (
           <GroupsPage
   token={token}
@@ -3901,7 +3913,30 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
   const [programsOpen, setProgramsOpen] = useState(true);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [editorFocus, setEditorFocus] = useState(false);
+  const [incomingShares, setIncomingShares] = useState([]);
+const [connections, setConnections] = useState([]);
+const [shareToConnectionId, setShareToConnectionId] = useState("");
+  async function loadConnections() {
+  try {
+    const res = await apiFetch("/api/connections", { token, onInvalidToken });
+    const list = Array.isArray(res?.accepted) ? res.accepted : [];
+    setConnections(list);
+    if (!shareToConnectionId && list[0]?.id) {
+      setShareToConnectionId(list[0].id);
+    }
+  } catch (e) {
+    onError(e.message);
+  }
+}
 
+async function loadIncomingShares() {
+  try {
+    const res = await apiFetch("/api/program-shares/incoming", { token, onInvalidToken });
+    setIncomingShares(Array.isArray(res?.shares) ? res.shares : []);
+  } catch (e) {
+    onError(e.message);
+  }
+}
   async function load() {
     try {
       setBusy(true);
@@ -3915,10 +3950,48 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
       setBusy(false);
     }
   }
+async function shareProgramToConnection(programId) {
+  try {
+    if (!shareToConnectionId) {
+      throw new Error("Pick a connection first");
+    }
 
+    await apiFetch(`/api/programs/${programId}/share-to-connection`, {
+      token,
+      method: "POST",
+      body: {
+        connection_id: shareToConnectionId,
+        message: "",
+      },
+      onInvalidToken,
+    });
+
+    alert("Program shared");
+    await loadIncomingShares();
+  } catch (e) {
+    onError(e.message);
+  }
+}
+async function copyIncomingShare(shareId) {
+  try {
+    await apiFetch(`/api/program-shares/${shareId}/copy`, {
+      token,
+      method: "POST",
+      onInvalidToken,
+    });
+
+    await load();
+    await loadIncomingShares();
+    alert("Program copied to your programs");
+  } catch (e) {
+    onError(e.message);
+  }
+}
   useEffect(() => {
-    load();
-  }, []);
+  load();
+  loadConnections();
+  loadIncomingShares();
+}, []);
 
   const selected = useMemo(
     () => programs.find((p) => p.id === selectedId) || null,
@@ -4113,7 +4186,22 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
                 {busy ? "…" : "Refresh"}
               </button>
             </div>
-
+            <div style={{ marginTop: 12 }}>
+  <div className="field">
+    <label>Share to connection</label>
+    <select
+      value={shareToConnectionId}
+      onChange={(e) => setShareToConnectionId(e.target.value)}
+    >
+      <option value="">Select connection…</option>
+      {connections.map((c) => (
+        <option key={c.id} value={c.id}>
+          {(c.other_name || c.other_email) + " • " + c.relationship_type}
+        </option>
+      ))}
+    </select>
+  </div>
+</div>
             <div style={{ height: 14 }} />
 
             <div className="list">
@@ -4173,6 +4261,13 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
       >
         Delete
       </button>
+      <button
+  className="secondary"
+  onClick={() => shareProgramToConnection(p.id)}
+  disabled={busy || !shareToConnectionId}
+>
+  Share
+</button>
     </div>
   </div>
 
@@ -4215,6 +4310,39 @@ function ProgramsPage({ token, unit, library, onInvalidToken, onError }) {
   }}
   onClick={() => setSummaryOpen(false)}
 >
+  <div style={{ height: 16 }} />
+<div className="card" style={{ background: "rgba(255,255,255,0.03)" }}>
+  <h3 style={{ marginTop: 0 }}>Shared with me</h3>
+
+  {incomingShares.length ? (
+    <div className="list">
+      {incomingShares.map((s) => (
+        <div className="listRow" key={s.id} style={{ alignItems: "flex-start" }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontWeight: 800 }}>{s.program_name || "Shared program"}</div>
+            <div className="small">
+              From <b>{s.shared_by_name || s.shared_by_email || "—"}</b>
+            </div>
+            <div className="small">
+              {s.total_weeks || 0} weeks • {s.days_per_week || 4} days/week
+            </div>
+            <div className="small">Status: <b>{s.status}</b></div>
+          </div>
+
+          <button
+            className="secondary"
+            onClick={() => copyIncomingShare(s.id)}
+            disabled={busy || s.status === "copied"}
+          >
+            {s.status === "copied" ? "Copied" : "Copy to my programs"}
+          </button>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="small">No incoming shared programs.</div>
+  )}
+</div>
   <div>
     <h2 style={{ margin: 0 }}>Summary</h2>
     <div className="small">Active program + quick stats.</div>
@@ -5461,7 +5589,213 @@ function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram }) {
     </div>
   );
 }
+function ConnectionsPage({ token, onInvalidToken, onError }) {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [accepted, setAccepted] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [busy, setBusy] = useState(false);
 
+  async function loadConnections() {
+    try {
+      const res = await apiFetch("/api/connections", { token, onInvalidToken });
+      setAccepted(Array.isArray(res?.accepted) ? res.accepted : []);
+      setPending(Array.isArray(res?.pending) ? res.pending : []);
+    } catch (e) {
+      onError(e.message);
+    }
+  }
+
+  async function searchUsers() {
+    try {
+      if (!q.trim()) {
+        setResults([]);
+        return;
+      }
+      const res = await apiFetch(
+        `/api/connections/search?q=${encodeURIComponent(q.trim())}`,
+        { token, onInvalidToken }
+      );
+      setResults(Array.isArray(res?.users) ? res.users : []);
+    } catch (e) {
+      onError(e.message);
+    }
+  }
+
+  useEffect(() => {
+    loadConnections();
+  }, [token]);
+
+  async function sendRequest(targetUserId, relationshipType) {
+    try {
+      setBusy(true);
+      await apiFetch("/api/connections/request", {
+        token,
+        method: "POST",
+        body: {
+          target_user_id: targetUserId,
+          relationship_type: relationshipType,
+        },
+        onInvalidToken,
+      });
+      await loadConnections();
+      await searchUsers();
+    } catch (e) {
+      onError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function acceptRequest(id) {
+    try {
+      setBusy(true);
+      await apiFetch(`/api/connections/${id}/accept`, {
+        token,
+        method: "POST",
+        onInvalidToken,
+      });
+      await loadConnections();
+    } catch (e) {
+      onError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function declineRequest(id) {
+    try {
+      setBusy(true);
+      await apiFetch(`/api/connections/${id}/decline`, {
+        token,
+        method: "POST",
+        onInvalidToken,
+      });
+      await loadConnections();
+    } catch (e) {
+      onError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="grid grid-2">
+      <div className="card">
+        <h2>Find people</h2>
+        <div className="small">Search by email or name, then connect as friend or coach/client.</div>
+
+        <div className="field" style={{ marginTop: 12 }}>
+          <label>Search users</label>
+          <div style={{ display: "flex", gap: 10 }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Type email or name"
+            />
+            <button className="secondary" onClick={searchUsers} disabled={busy}>
+              Search
+            </button>
+          </div>
+        </div>
+
+        <div className="list" style={{ marginTop: 12 }}>
+          {results.length ? (
+            results.map((u) => (
+              <div className="listRow" key={u.id} style={{ alignItems: "flex-start" }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 800 }}>{u.name || u.email}</div>
+                  <div className="small">{u.email}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    className="secondary"
+                    onClick={() => sendRequest(u.id, "friend")}
+                    disabled={busy}
+                  >
+                    Add friend
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => sendRequest(u.id, "coach")}
+                    disabled={busy}
+                  >
+                    Invite as coach
+                  </button>
+                  <button
+                    className="secondary"
+                    onClick={() => sendRequest(u.id, "client")}
+                    disabled={busy}
+                  >
+                    Invite as client
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="small">No results yet.</div>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>Pending requests</h2>
+        <div className="list" style={{ marginTop: 12 }}>
+          {pending.length ? (
+            pending.map((p) => (
+              <div className="listRow" key={p.id} style={{ alignItems: "flex-start" }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 800 }}>
+                    {p.other_name || p.other_email}
+                  </div>
+                  <div className="small">
+                    {p.other_email} • {p.relationship_type} • {p.direction}
+                  </div>
+                </div>
+
+                {p.direction === "incoming" ? (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button className="secondary" onClick={() => acceptRequest(p.id)} disabled={busy}>
+                      Accept
+                    </button>
+                    <button className="secondary" onClick={() => declineRequest(p.id)} disabled={busy}>
+                      Decline
+                    </button>
+                  </div>
+                ) : (
+                  <div className="small">Waiting</div>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="small">No pending requests.</div>
+          )}
+        </div>
+
+        <hr />
+
+        <h2>Accepted connections</h2>
+        <div className="list" style={{ marginTop: 12 }}>
+          {accepted.length ? (
+            accepted.map((c) => (
+              <div className="listRow" key={c.id}>
+                <div>
+                  <div style={{ fontWeight: 800 }}>{c.other_name || c.other_email}</div>
+                  <div className="small">
+                    {c.other_email} • {c.relationship_type}
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="small">No accepted connections yet.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function WeeksTable({ weekly, dailyOverview, unit, tracked }) {
   const cols = (tracked || []).slice(0, 6);

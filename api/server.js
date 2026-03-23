@@ -38,6 +38,27 @@ function calcE1RM(weight, reps) {
   if (!weight || !reps) return null;
   return Math.round(weight * (1 + reps / 30));
 }
+function normalizeRelationshipType(value) {
+  const v = String(value || "").trim().toLowerCase();
+  if (v === "friend" || v === "coach" || v === "client") return v;
+  return "friend";
+}
+
+function cloneProgramForUser(programRow, newUserId) {
+  const blocks = Array.isArray(programRow?.blocks)
+    ? JSON.parse(JSON.stringify(programRow.blocks))
+    : [];
+
+  return {
+    name: `${programRow?.name || "Shared Program"} (Copy)`,
+    user_id: newUserId,
+    days_per_week: Number(programRow?.days_per_week || 4),
+    total_weeks: Number(programRow?.total_weeks || 0),
+    blocks,
+    start_date: null,
+    training_days: null,
+  };
+}
 async function supabaseSignup(email, password, name) {
   const url = `${SUPABASE_URL}/auth/v1/signup`;
   const r = await fetch(url, {
