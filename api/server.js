@@ -5704,6 +5704,104 @@ app.post("/api/programs/:id/share-to-connection", requireAuth, async (req, res) 
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+// =============================
+// PROGRAM SHARING
+// =============================
+
+// send program
+app.post("/api/program-shares", requireAuth, async (req, res) => {
+  try {
+    const { to_user_id, program_id } = req.body;
+
+    if (!to_user_id || !program_id) {
+      return res.status(400).json({ error: "missing fields" });
+    }
+
+    await pool.query(
+      `insert into program_shares (from_user_id, to_user_id, program_id, status)
+       values ($1,$2,$3,'pending')`,
+      [req.user.id, to_user_id, program_id]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.get("/api/program-shares/incoming", requireAuth, async (req, res) => {
+  try {
+    const q = await pool.query(
+      `select ps.*, p.name as program_name, u.name as from_name
+       from program_shares ps
+       join programs_app p on p.id = ps.program_id
+       join app_users u on u.id = ps.from_user_id
+       where ps.to_user_id = $1
+       order by ps.created_at desc`,
+      [req.user.id]
+    );
+
+    res.json({ shares: q.rows });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.get("/api/program-shares/outgoing", requireAuth, async (req, res) => {
+  try {
+    const q = await pool.query(
+      `select ps.*, u.name as to_name
+       from program_shares ps
+       join app_users u on u.id = ps.to_user_id
+       where ps.from_user_id = $1
+       order by ps.created_at desc`,
+      [req.user.id]
+    );
+
+    res.json({ shares: q.rows });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/program-shares/:id/accept", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const share = await pool.query(
+      `select * from program_shares where id=$1`,
+      [id]
+    );
+
+    if (!share.rows.length) {
+      return res.status(404).json({ error: "not found" });
+    }
+
+    if (share.rows[0].to_user_id !== req.user.id) {
+      return res.status(403).json({ error: "not your share" });
+    }
+
+    await pool.query(
+      `update program_shares set status='accepted' where id=$1`,
+      [id]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.post("/api/program-shares/:id/decline", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    await pool.query(
+      `update program_shares set status='declined' where id=$1`,
+      [id]
+    );
+
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
 app.post("/api/program-shares/:id/copy", requireAuth, async (req, res) => {
   try {
     const shareId = String(req.params.id || "").trim();
