@@ -1895,7 +1895,7 @@ app.put("/api/daily/:date", requireAuth, async (req, res) => {
       const exercise = String(e?.exercise || "").trim();
       if (!exercise) continue;
 
-      const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+      const top = parseTrainingLoad(e?.actual?.top ?? e?.top, bodyweight ?? null);
       const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
       const e1rm = e1rmEpley(top, reps);
 
@@ -1918,16 +1918,38 @@ for (const c of prCandidates) {
   }
 }
 
-// ✅ Step 2: run PR logic once per exercise
-for (const c of Object.values(bestByExercise)) {
-  const prev = await pool.query(`
-    select max(weight) as best
-    from daily_entries_app
-    where user_id = $1
-      and exercise = $2
-  `, [req.user.id, c.exercise]);
+// ✅ Step 2: load prior daily rows once
+const priorDailyQ = await pool.query(
+  `select entry_date, bodyweight, entries
+   from public.daily_entries_app
+   where user_id = $1
+     and entry_date < $2::date
+   order by entry_date asc`,
+  [req.user.id, date]
+);
 
-  const prevBestWeight = prev.rows[0]?.best || 0;
+// ✅ Step 3: run PR logic once per exercise, based on ACTUAL top weight
+for (const c of Object.values(bestByExercise)) {
+  let prevBestWeight = 0;
+
+  for (const row of priorDailyQ.rows || []) {
+    const rowEntries = Array.isArray(row.entries) ? row.entries : [];
+
+    for (const e of rowEntries) {
+      const ex = String(e?.exercise || "").trim();
+      if (!ex) continue;
+      if (normalizeExerciseName(ex) !== normalizeExerciseName(c.exercise)) continue;
+
+      const prevTop = parseTrainingLoad(
+        e?.actual?.top ?? e?.top,
+        row?.bodyweight ?? null
+      );
+
+      if (Number.isFinite(prevTop) && prevTop > prevBestWeight) {
+        prevBestWeight = prevTop;
+      }
+    }
+  }
 
   if (c.top > prevBestWeight) {
     await createPrEventsForGroups({
@@ -5861,6 +5883,103 @@ app.post("/api/program-shares/:id/copy", requireAuth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+/* =====================
+   Mobile
+===================== */
+
+/* =====================
+   Mobile Program Sessions
+===================== */
+app.get("/api/mobile/program-sessions", requireAuth, async (req, res) => {
+  try {
+    const u = await pool.query(
+      `select active_program_id
+       from public.app_users
+       where id=$1`,
+      [req.user.id]
+    );
+
+    const pid = u.rows?.[0]?.active_program_id || null;
+    if (!pid) {
+      return res.json({
+        has_program: false,
+        reason: "no_active_program",
+        sessions: [],
+      });
+    }
+
+    const p = await pool.query(
+      `select id, name, days_per_week, blocks, total_weeks, start_date, training_days
+       from public.programs_app
+       where id=$1 and user_id=$2`,
+      [pid, req.user.id]
+    );
+
+    if (p.rowCount === 0) {
+      return res.json({
+        has_program: false,
+        reason: "program_missing",
+        sessions: [],
+      });
+    }
+
+    const prog = p.rows[0];
+    const blocks = Array.isArray(prog.blocks) ? prog.blocks : [];
+    const sessions = [];
+
+    let absoluteWeek = 1;
+
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const block = blocks[bi];
+      const weeksInBlock = Math.max(1, Number(block?.weeks || 0));
+      const days = Array.isArray(block?.days) ? block.days : [];
+
+      for (let w = 1; w <= weeksInBlock; w++) {
+        for (const dayObj of days) {
+          const rows = Array.isArray(dayObj?.rows) ? dayObj.rows : [];
+          const wkKey = `W${absoluteWeek}`;
+
+          const rowsWithTargets = rows.map((r) => ({
+            ...r,
+            week_target: r?.week_values?.[wkKey] ?? "",
+            wk_key: wkKey,
+          }));
+
+          sessions.push({
+            key: `B${bi + 1}-W${w}-D${Number(dayObj?.day_number || 1)}`,
+            label: `Block ${bi + 1} • Week ${w} • Day ${Number(dayObj?.day_number || 1)}`,
+            date: null,
+            unit: "kg",
+            has_program: true,
+            program_id: prog.id,
+            program_name: prog.name,
+            block_number: bi + 1,
+            block_week: w,
+            week_number: absoluteWeek,
+            day_number: Number(dayObj?.day_number || 1),
+            day_title: dayObj?.title || `Day ${Number(dayObj?.day_number || 1)}`,
+            is_training_day: true,
+            is_completed: false,
+            day: null,
+            entries: buildEntriesFromPlanRowsServer(rowsWithTargets),
+          });
+        }
+
+        absoluteWeek += 1;
+      }
+    }
+
+    return res.json({
+      has_program: true,
+      program_id: prog.id,
+      program_name: prog.name,
+      sessions,
+    });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
 /* =====================
    Boot
 ===================== */
