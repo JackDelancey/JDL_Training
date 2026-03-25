@@ -812,6 +812,7 @@ app.get("/api/me", requireAuth, async (req, res) => {
       `select id, email, name,
               coalesce(unit_pref, units, 'kg') as unit_pref,
               coalesce(use_rpe, true) as use_rpe,
+              coalesce(onboarding_complete, false) as onboarding_complete,
               exercise_library,
               tracked_exercises,
               dashboard_exercises,
@@ -838,6 +839,20 @@ app.patch("/api/me/preferences", requireAuth, async (req, res) => {
     );
 
     res.json({ ok: true, use_rpe: useRpe });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+app.patch("/api/me/onboarding", requireAuth, async (req, res) => {
+  try {
+    await pool.query(
+      `alter table public.app_users add column if not exists onboarding_complete boolean not null default false`
+    );
+    await pool.query(
+      `update public.app_users set onboarding_complete = true where id = $1`,
+      [req.user.id]
+    );
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });
   }
