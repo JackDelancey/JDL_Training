@@ -5569,8 +5569,11 @@ function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram }) {
   return (
     <div className="grid grid-3">
       {top3.map((ex) => {
-        const weeklyLatest = latest?.metrics_by_exercise?.[ex]?.e1rm;
-        const latestVal = weeklyLatest != null ? weeklyLatest : dailyLatestByExercise[ex];
+        const weeklyLatest = latest?.metrics_by_exercise?.[ex]?.e1rm ?? null;
+const dailyLatest = dailyLatestByExercise[ex] ?? null;
+const latestVal = (weeklyLatest != null && dailyLatest != null)
+  ? Math.max(weeklyLatest, dailyLatest)
+  : weeklyLatest ?? dailyLatest;
         const planned = plannedByExercise?.[ex];
 
         return (
@@ -5990,61 +5993,90 @@ function Charts({ weekly, dailyOverview, unit, tracked }) {
         const series = hasWeekly ? wSeries : dSeriesObj.values;
 
         return (
-          <div key={ex} className="card">
-            <div style={{ fontWeight: 800 }}>{ex} trend</div>
+  <div key={ex} className="card">
+    <div style={{ fontWeight: 800 }}>{ex} trend</div>
+    <div style={{ height: "260px", maxWidth: "100%", position: "relative", overflow: "hidden", marginTop: 10 }}>
+      {(() => {
+        // Build a map of week_number → best e1rm from weekly entries
+        const weeklyMap = new Map();
+        (weekly || []).forEach((w) => {
+          const val = Number(w?.metrics_by_exercise?.[ex]?.e1rm);
+          if (Number.isFinite(val)) weeklyMap.set(w.week_number, val);
+        });
 
-            <div
-              style={{
-                height: "260px",
-                maxHeight: "260px",
-                width: "100%",
-                position: "relative",
-                overflow: "hidden",
-                marginTop: 10,
-              }}
-            >
-              {series.some((v) => Number.isFinite(v)) ? (
-                <Line
-                  data={{
-                    labels,
-                    datasets: [
-                      {
-                        label: `${ex} e1RM (${unit})`,
-                        data: series,
-                        tension: 0.25,
-                        borderWidth: 3,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: true,
-                        borderColor: "rgba(239,68,68,1)",
-                        backgroundColor: (ctx) => {
-                          const chart = ctx.chart;
-                          const { ctx: c, chartArea } = chart;
-                          if (!chartArea) return "rgba(239,68,68,0.12)";
-                          const g = c.createLinearGradient(
-                            0,
-                            chartArea.top,
-                            0,
-                            chartArea.bottom
-                          );
-                          g.addColorStop(0, "rgba(239,68,68,0.28)");
-                          g.addColorStop(1, "rgba(239,68,68,0.02)");
-                          return g;
-                        },
-                        spanGaps: false,
-                      },
-                    ],
-                  }}
-                  options={options}
-                />
-              ) : (
-                <div className="small" style={{ paddingTop: 12 }}>
-                  No e1RM data yet for {ex}.
-                </div>
-              )}
-            </div>
-          </div>
+        // Build a map of week_number → best e1rm from daily entries
+        const norm = normalizeExerciseName(ex);
+        const dailyMap = new Map();
+        (dailyOverview || []).forEach((day) => {
+          const d = new Date(day?.entry_date);
+          if (!Number.isFinite(d.getTime())) return;
+          // Derive week number relative to program or just use ISO week bucket
+          (day?.entries || []).forEach((e) => {
+            if (normalizeExerciseName(e?.exercise) !== norm) return;
+            const val = e1rmFromTopReps(e?.actual?.top ?? e?.top, e?.actual?.reps ?? e?.reps);
+            if (!Number.isFinite(val)) return;
+            // Use entry_date to bucket into a week key (ISO week-of-year)
+            const weekKey = `daily_${day.entry_date}`;
+            const cur = dailyMap.get(weekKey);
+            if (!cur || val > cur.val) dailyMap.set(weekKey, { val, date: day.entry_date });
+          });
+        });
+
+        // Merge: weekly entries by week number, then append daily entries not covered
+        const allWeekNums = Array.from(new Set([
+          ...(weekly || []).map((w) => w.week_number)
+        ])).sort((a, b) => a - b);
+
+        // Also collect daily points that fall after the last weekly entry
+        const lastWeekNum = allWeekNums.length ? Math.max(...allWeekNums) : 0;
+        const dailyPoints = Array.from(dailyMap.values())
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+        const labels = [
+          ...allWeekNums.map((w) => `W${w}`),
+          ...dailyPoints.map((p) => p.date.slice(5)), // MM-DD
+        ];
+
+        const series = [
+          ...allWeekNums.map((w) => weeklyMap.get(w) ?? null),
+          ...dailyPoints.map((p) => p.val),
+        ];
+
+        if (!series.some((v) => Number.isFinite(v))) {
+          return <div className="small" style={{ paddingTop: 12 }}>No e1RM data yet for {ex}.</div>;
+        }
+
+        return (
+          <Line
+            data={{
+              labels,
+              datasets: [{
+                label: `${ex} e1RM (${unit})`,
+                data: series,
+                tension: 0.25,
+                borderWidth: 3,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                borderColor: "rgba(239,68,68,1)",
+                backgroundColor: (ctx) => {
+                  const { ctx: c, chartArea } = ctx.chart;
+                  if (!chartArea) return "rgba(239,68,68,0.12)";
+                  const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                  g.addColorStop(0, "rgba(239,68,68,0.28)");
+                  g.addColorStop(1, "rgba(239,68,68,0.02)");
+                  return g;
+                },
+                spanGaps: true,
+              }],
+            }}
+            options={options}
+          />
         );
+      })()}
+    </div>
+  </div>
+);
       })}
     </div>
   );
