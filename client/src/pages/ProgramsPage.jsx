@@ -4,6 +4,8 @@ import { apiFetch } from "../utils/api";
 import { formatPrettyDate } from "../utils/dates";
 import { sumWeeks, draftKey, hasDraft } from "../utils/calcs";
 import { Notice } from "../components/Auth";
+import { useApp } from "../context/AppContext";
+
 
 // ─── Schedule Editor ──────────────────────────────────────────────────
 
@@ -58,6 +60,8 @@ function ProgramScheduleEditor({ program, busy, onSave }) {
 // ─── Program Editor ───────────────────────────────────────────────────
 
 function ProgramEditor({ program, library, unit, token, onSave, busy, onInvalidToken, onError }) {
+  const { me } = useApp();
+  const showRpe = me?.use_rpe !== false;
   const [p, setP] = useState(program);
   const [draftNotice, setDraftNotice] = useState(false);
   const [openBlock, setOpenBlock] = useState(0);
@@ -197,7 +201,7 @@ function ProgramEditor({ program, library, unit, token, onSave, busy, onInvalidT
                       <table className="sheetTable">
                         <thead>
                           <tr>
-                            <th>Exercise</th><th>Sets x Reps</th><th>Load / RPE</th><th>Notes</th>
+                            <th>Exercise</th><th>Sets x Reps</th>{showRpe && <th>Load / RPE</th>}<th>Notes</th>
                             {weekKeys.map((wk) => <th key={wk} style={{ minWidth: 90 }}>{wk}</th>)}
                             <th style={{ minWidth: 90 }}>Actions</th>
                           </tr>
@@ -212,7 +216,9 @@ function ProgramEditor({ program, library, unit, token, onSave, busy, onInvalidT
                                 </select>
                               </td>
                               <td><input value={row.sets_reps || ""} onChange={(e) => updateRow(bi, di, row.id, { sets_reps: e.target.value })} /></td>
-                              <td><input value={row.load_rpe || ""} onChange={(e) => updateRow(bi, di, row.id, { load_rpe: e.target.value })} placeholder={`e.g. RPE 7, 75%, ${unit}`} /></td>
+                              {showRpe && (
+  <td><input value={row.load_rpe || ""} onChange={(e) => updateRow(bi, di, row.id, { load_rpe: e.target.value })} placeholder={`e.g. RPE 7, 75%`} /></td>
+)}
                               <td><input value={row.notes || ""} onChange={(e) => updateRow(bi, di, row.id, { notes: e.target.value })} /></td>
                               {weekKeys.map((wk) => (
                                 <td key={wk}><input value={(row.week_values || {})[wk] ?? ""} onChange={(e) => updateWeekValue(bi, di, row.id, wk, e.target.value)} /></td>

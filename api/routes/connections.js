@@ -39,13 +39,13 @@ router.post("/connections/request", requireAuth, async (req, res) => {
     if (targetUserId === req.user.id) return res.status(400).json({ error: "You cannot connect to yourself" });
 
     const existing = await pool.query(
-      `select id, status from public.user_connections
-       where least(requester_user_id, target_user_id) = least($1,$2)
-         and greatest(requester_user_id, target_user_id) = greatest($1,$2)
-         and relationship_type = $3
-       limit 1`,
-      [req.user.id, targetUserId, relationshipType]
-    );
+  `select id, status from public.user_connections
+   where least(requester_user_id::text, target_user_id::text) = least($1::text,$2::text)
+     and greatest(requester_user_id::text, target_user_id::text) = greatest($1::text,$2::text)
+     and relationship_type = $3
+   limit 1`,
+  [req.user.id, targetUserId, relationshipType]
+);
     if (existing.rows[0]) return res.json({ ok: true, connection: existing.rows[0], already_exists: true });
 
     const ins = await pool.query(

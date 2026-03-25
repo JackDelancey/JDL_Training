@@ -190,6 +190,27 @@ router.put("/daily/:date", requireAuth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+// selected session dedupe
+
+async function copySelectedSession() {
+  try {
+    const rows = selectedSlotObj?.rows || plan?.rows || [];
+    if (!rows.length) return;
+    setBusy(true);
+
+    // Dedup — don't add exercises already in the log
+    const existingExercises = new Set((day?.entries || []).map((e) => e.exercise));
+    const newEntries = buildEntriesFromPlanRows(rows).filter((e) => !existingExercises.has(e.exercise));
+    const entries = [...(day?.entries || []), ...newEntries];
+
+    await apiFetch(`/api/daily/${date}`, {
+      token, method: "PUT",
+      body: { unit, bodyweight: day?.bodyweight ?? null, sleep_hours: day?.sleep_hours ?? null, pec_pain_0_10: day?.pec_pain_0_10 ?? null, zone2_mins: day?.zone2_mins ?? null, notes: day?.notes ?? null, entries, is_completed: day?.is_completed === true, completed_at: day?.completed_at ?? null },
+      onInvalidToken,
+    });
+    await loadAll(date);
+  } catch (e) { setErr(e.message); } finally { setBusy(false); }
+}
 
 // ─── POST append single entry ─────────────────────────────────────────
 

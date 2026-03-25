@@ -51,7 +51,7 @@ router.get("/adherence/program", requireAuth, async (req, res) => {
     }
 
     const prog = p.rows[0];
-    const startISO = prog.start_date ? String(prog.start_date) : null;
+    const startISO = prog.start_date ? String(prog.start_date).slice(0, 10) : null;
     if (!parseISODate(startISO || "")) {
       return res.json({ from, to, program_id: prog.id, planned_sessions: 0, completed_sessions: 0, adherence_pct: null, by_week: [], reason: "program_missing_start_date" });
     }

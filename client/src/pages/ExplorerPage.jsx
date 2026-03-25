@@ -140,14 +140,29 @@ export default function ExplorerPage() {
   }, [data]);
 
   const oneRmTrend = useMemo(() => {
-    const rows = Array.isArray(data?.trend_history) ? data.trend_history : [];
-    if (!rows.length) return null;
-    return {
-      labels: rows.map((r) => r.label || "—"),
-      actualSeries: rows.map((r) => (r.source === "daily" || r.source === "weekly") && Number.isFinite(Number(r.e1rm)) ? Number(r.e1rm) : null),
-      plannedSeries: rows.map((r) => r.source === "program" && Number.isFinite(Number(r.e1rm)) ? Number(r.e1rm) : null),
-    };
-  }, [data]);
+  const rows = Array.isArray(data?.trend_history) ? data.trend_history : [];
+  if (!rows.length) return null;
+
+  // Separate actual and planned
+  const actual = rows.filter((r) => r.source === "daily" || r.source === "weekly");
+  const planned = rows.filter((r) => r.source === "program");
+
+  // Use a unified label set — dates for actual, week labels for planned
+  // Merge onto same timeline by using all labels in order
+  const allLabels = rows.map((r) => r.label || "—");
+
+  return {
+    labels: allLabels,
+    actualSeries: rows.map((r) =>
+      (r.source === "daily" || r.source === "weekly") && Number.isFinite(Number(r.e1rm))
+        ? Number(r.e1rm) : null
+    ),
+    plannedSeries: rows.map((r) =>
+      r.source === "program" && Number.isFinite(Number(r.e1rm))
+        ? Number(r.e1rm) : null
+    ),
+  };
+}, [data]);
 
   const curveOpts = useMemo(() => CHART_OPTS(unit, showPctDrop ? "Strength curve (% of best 1RM)" : `${curveMetric === "e1rm" ? "e1RM" : "Top set"} (${unit})`), [unit, curveMetric, showPctDrop]);
   const trendOpts = useMemo(() => CHART_OPTS(unit, `Estimated 1RM (${unit})`), [unit]);
@@ -245,9 +260,9 @@ export default function ExplorerPage() {
                   <Line data={{
                     labels: oneRmTrend.labels,
                     datasets: [
-                      { label: "Actual e1RM", data: oneRmTrend.actualSeries, tension: 0.25, borderWidth: 3, pointRadius: 4, fill: false, borderColor: "rgba(239,68,68,1)" },
-                      { label: "Planned e1RM", data: oneRmTrend.plannedSeries, tension: 0.25, borderWidth: 2, pointRadius: 4, fill: false, borderDash: [6, 6], borderColor: "rgba(59,130,246,1)" },
-                    ],
+  { label: "Actual e1RM", data: oneRmTrend.actualSeries, tension: 0.25, borderWidth: 3, pointRadius: 4, fill: false, borderColor: "rgba(239,68,68,1)", spanGaps: false },
+  { label: "Planned e1RM", data: oneRmTrend.plannedSeries, tension: 0.25, borderWidth: 2, pointRadius: 4, fill: false, borderDash: [6, 6], borderColor: "rgba(59,130,246,1)", spanGaps: false },
+],
                   }} options={trendOpts} />
                 </div>
               ) : <div className="small">Not enough history yet.</div>}

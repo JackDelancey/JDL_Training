@@ -43,7 +43,10 @@ input, select {
   border-radius: 14px;
   padding: 10px;
 }
-
+select option {
+  background: #0f1012;
+  color: rgba(255,255,255,0.92);
+}
 .sheetTable {
   width: 100%;
   border-collapse: collapse;
