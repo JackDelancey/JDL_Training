@@ -692,12 +692,13 @@ function Overview({
 
           <div style={{ height: 14 }} />
 
-          <Charts
-            weekly={weekly}
-            dailyOverview={dailyOverview}
-            unit={unit}
-            tracked={dashboardExercises}
-          />
+<Charts
+  weekly={weekly}
+  dailyOverview={dailyOverview}
+  unit={unit}
+  tracked={dashboardExercises}
+  activeProgram={activeProgram}  // add this
+/>
         </div>
       </div>
 
@@ -5577,32 +5578,53 @@ function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram }) {
 
   const top3 = (tracked || []).slice(0, 3);
 
-  return (
-    <div className="grid grid-3">
-      {top3.map((ex) => {
-        const weeklyLatest = latest?.metrics_by_exercise?.[ex]?.e1rm ?? null;
-const dailyLatest = dailyLatestByExercise[ex] ?? null;
-const latestVal = (weeklyLatest != null && dailyLatest != null)
-  ? Math.max(weeklyLatest, dailyLatest)
-  : weeklyLatest ?? dailyLatest;
-        const planned = plannedByExercise?.[ex];
+return (
+  <div className="grid grid-3">
+    {top3.map((ex) => {
+      const norm = normalizeExerciseName(ex);
 
-        return (
-          <div className="metric" key={ex}>
-            <div className="k">{ex} e1RM (latest)</div>
-            <div className="v">
-              {latestVal != null ? fmt(latestVal) : "—"}{" "}
-              <span className="small">{unit}</span>
-            </div>
-            <div className="s">
-              Best: {bestMap[ex] != null ? `${fmt(bestMap[ex])} ${unit}` : "—"}
-            </div>
-            <div className="s">Planned W{nextWeek}: {planned != null ? planned : "—"}</div>
+      // Best e1rm from daily
+      const dailyBest = dailyBestByExercise[ex] ?? null;
+      const dailyLatest = dailyLatestByExercise[ex] ?? null;
+
+      // Best e1rm from weekly
+      const weeklyBest = (() => {
+        const vals = (weekly || [])
+          .map((w) => Number(w.metrics_by_exercise?.[ex]?.e1rm))
+          .filter(Number.isFinite);
+        return vals.length ? Math.max(...vals) : null;
+      })();
+
+      // Latest from weekly (last entry)
+      const weeklyLatest = latest?.metrics_by_exercise?.[ex]?.e1rm ?? null;
+
+      // Use whichever is higher for both tiles
+      const latestVal = [weeklyLatest, dailyLatest]
+        .filter(v => Number.isFinite(v))
+        .reduce((a, b) => Math.max(a, b), -Infinity);
+      
+      const bestVal = [weeklyBest, dailyBest]
+        .filter(v => Number.isFinite(v))
+        .reduce((a, b) => Math.max(a, b), -Infinity);
+
+      const planned = plannedByExercise?.[ex];
+
+      return (
+        <div className="metric" key={ex}>
+          <div className="k">{ex} e1RM (latest)</div>
+          <div className="v">
+            {Number.isFinite(latestVal) ? fmt(latestVal) : "—"}{" "}
+            <span className="small">{unit}</span>
           </div>
-        );
-      })}
-    </div>
-  );
+          <div className="s">
+            Best: {Number.isFinite(bestVal) ? `${fmt(bestVal)} ${unit}` : "—"}
+          </div>
+          <div className="s">Planned W{nextWeek}: {planned ?? "—"}</div>
+        </div>
+      );
+    })}
+  </div>
+);
 }
 function ConnectionsPage({ token, onInvalidToken, onError }) {
   const [q, setQ] = useState("");
@@ -5903,55 +5925,38 @@ function WeeksTable({ weekly, dailyOverview, unit, tracked }) {
    Charts
 ===================== */
 
-function Charts({ weekly, dailyOverview, unit, tracked }) {
+function Charts({ weekly, dailyOverview, unit, tracked, activeProgram }) {
   const safeTracked = Array.isArray(tracked) ? tracked.slice(0, 6) : [];
 
-  function weeklySeries(ex) {
-    return (weekly || []).map((w) => {
-      const val = Number(w?.metrics_by_exercise?.[ex]?.e1rm);
-      return Number.isFinite(val) ? val : null;
-    });
-  }
+  const fmtDate = (iso) => {
+    const d = new Date(String(iso).slice(0, 10) + "T00:00:00Z");
+    if (!Number.isFinite(d.getTime())) return String(iso);
+    return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${d.getUTCFullYear()}`;
+  };
 
-  function dailySeries(ex) {
-    const norm = normalizeExerciseName(ex);
-    const bucketMap = new Map();
+  const weekNumToDate = (weekNum) => {
+    const start = activeProgram?.start_date;
+    const trainingDays = activeProgram?.training_days;
+    const daysPerWeek = Math.max(1, Number(activeProgram?.days_per_week || 4));
+    if (!start || !Array.isArray(trainingDays) || !trainingDays.length) return `W${weekNum}`;
 
-    for (const day of dailyOverview || []) {
-      const date = String(day?.entry_date || "");
-      if (!date) continue;
+    const startD = new Date(String(start).slice(0, 10) + "T00:00:00Z");
+    const tset = new Set(trainingDays.map(Number));
+    let sessionCount = 0;
 
-      const d = new Date(date);
-      if (!Number.isFinite(d.getTime())) continue;
-
-      const start = new Date(d);
-      start.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-      const weekKey = isoLocal(start);
-
-      const entries = Array.isArray(day?.entries) ? day.entries : [];
-      for (const e of entries) {
-        if (normalizeExerciseName(e?.exercise) !== norm) continue;
-
-        const val = e1rmFromTopReps(
-          e?.actual?.top ?? e?.top,
-          e?.actual?.reps ?? e?.reps
-        );
-        if (!Number.isFinite(val)) continue;
-
-        const prev = bucketMap.get(weekKey);
-        if (!Number.isFinite(prev) || val > prev) bucketMap.set(weekKey, val);
+    for (let i = 0; i < 730; i++) {
+      const d = new Date(startD);
+      d.setUTCDate(startD.getUTCDate() + i);
+      if (tset.has(d.getUTCDay())) {
+        sessionCount++;
+        const wk = Math.ceil(sessionCount / daysPerWeek);
+        if (wk === weekNum) {
+          return fmtDate(d.toISOString().slice(0, 10));
+        }
       }
     }
-
-    const weeks = Array.from(bucketMap.entries()).sort((a, b) =>
-      a[0].localeCompare(b[0])
-    );
-
-    return {
-      labels: weeks.map((_, i) => `W${i + 1}`),
-      values: weeks.map((x) => x[1]),
-    };
-  }
+    return `W${weekNum}`;
+  };
 
   const options = useMemo(
     () => ({
@@ -5974,7 +5979,7 @@ function Charts({ weekly, dailyOverview, unit, tracked }) {
       },
       scales: {
         x: {
-          ticks: { color: "rgba(255,255,255,0.65)" },
+          ticks: { color: "rgba(255,255,255,0.65)", maxRotation: 45 },
           grid: { color: "rgba(255,255,255,0.06)" },
         },
         y: {
@@ -5995,102 +6000,87 @@ function Charts({ weekly, dailyOverview, unit, tracked }) {
   return (
     <div className="grid grid-2">
       {safeTracked.map((ex) => {
-        const wLabels = (weekly || []).map((w) => `W${w.week_number}`);
-        const wSeries = weeklySeries(ex);
-        const hasWeekly = wSeries.some((v) => Number.isFinite(v));
+        const norm = normalizeExerciseName(ex);
 
-        const dSeriesObj = dailySeries(ex);
-        const labels = hasWeekly ? wLabels : dSeriesObj.labels;
-        const series = hasWeekly ? wSeries : dSeriesObj.values;
-
-        return (
-  <div key={ex} className="card">
-    <div style={{ fontWeight: 800 }}>{ex} trend</div>
-    <div style={{ height: "260px", maxWidth: "100%", position: "relative", overflow: "hidden", marginTop: 10 }}>
-      {(() => {
-        // Build a map of week_number → best e1rm from weekly entries
+        // Weekly entries → week_number to best e1rm
         const weeklyMap = new Map();
         (weekly || []).forEach((w) => {
           const val = Number(w?.metrics_by_exercise?.[ex]?.e1rm);
           if (Number.isFinite(val)) weeklyMap.set(w.week_number, val);
         });
 
-        // Build a map of week_number → best e1rm from daily entries
-        const norm = normalizeExerciseName(ex);
+        // Daily entries → date string to best e1rm
         const dailyMap = new Map();
         (dailyOverview || []).forEach((day) => {
-          const d = new Date(day?.entry_date);
-          if (!Number.isFinite(d.getTime())) return;
-          // Derive week number relative to program or just use ISO week bucket
+          const isoDate = String(day?.entry_date || "").slice(0, 10);
+          if (!isoDate) return;
           (day?.entries || []).forEach((e) => {
             if (normalizeExerciseName(e?.exercise) !== norm) return;
-            const val = e1rmFromTopReps(e?.actual?.top ?? e?.top, e?.actual?.reps ?? e?.reps);
+            const val = e1rmFromTopReps(
+              e?.actual?.top ?? e?.top,
+              e?.actual?.reps ?? e?.reps
+            );
             if (!Number.isFinite(val)) return;
-            // Use entry_date to bucket into a week key (ISO week-of-year)
-            const weekKey = `daily_${day.entry_date}`;
-            const cur = dailyMap.get(weekKey);
-            if (!cur || val > cur.val) dailyMap.set(weekKey, { val, date: day.entry_date });
+            const cur = dailyMap.get(isoDate);
+            if (!cur || val > cur.val) dailyMap.set(isoDate, { val, date: isoDate });
           });
         });
 
-        // Merge: weekly entries by week number, then append daily entries not covered
-        const allWeekNums = Array.from(new Set([
-          ...(weekly || []).map((w) => w.week_number)
-        ])).sort((a, b) => a - b);
+        const allWeekNums = Array.from(new Set(
+          (weekly || []).map((w) => w.week_number)
+        )).sort((a, b) => a - b);
 
-        // Also collect daily points that fall after the last weekly entry
-        const lastWeekNum = allWeekNums.length ? Math.max(...allWeekNums) : 0;
         const dailyPoints = Array.from(dailyMap.values())
           .sort((a, b) => a.date.localeCompare(b.date));
 
         const labels = [
-  ...allWeekNums.map((w) => `W${w}`),
-  ...dailyPoints.map((p) => {
-    const d = new Date(p.date);
-    return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
-  }),
-];
+          ...allWeekNums.map((w) => weekNumToDate(w)),
+          ...dailyPoints.map((p) => fmtDate(p.date)),
+        ];
 
         const series = [
           ...allWeekNums.map((w) => weeklyMap.get(w) ?? null),
           ...dailyPoints.map((p) => p.val),
         ];
 
-        if (!series.some((v) => Number.isFinite(v))) {
-          return <div className="small" style={{ paddingTop: 12 }}>No e1RM data yet for {ex}.</div>;
-        }
-
         return (
-          <Line
-            data={{
-              labels,
-              datasets: [{
-                label: `${ex} e1RM (${unit})`,
-                data: series,
-                tension: 0.25,
-                borderWidth: 3,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true,
-                borderColor: "rgba(239,68,68,1)",
-                backgroundColor: (ctx) => {
-                  const { ctx: c, chartArea } = ctx.chart;
-                  if (!chartArea) return "rgba(239,68,68,0.12)";
-                  const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                  g.addColorStop(0, "rgba(239,68,68,0.28)");
-                  g.addColorStop(1, "rgba(239,68,68,0.02)");
-                  return g;
-                },
-                spanGaps: true,
-              }],
-            }}
-            options={options}
-          />
+          <div key={ex} className="card">
+            <div style={{ fontWeight: 800 }}>{ex} trend</div>
+            <div style={{ height: "260px", maxWidth: "100%", position: "relative", overflow: "hidden", marginTop: 10 }}>
+              {series.some((v) => Number.isFinite(v)) ? (
+                <Line
+                  data={{
+                    labels,
+                    datasets: [{
+                      label: `${ex} e1RM (${unit})`,
+                      data: series,
+                      tension: 0.25,
+                      borderWidth: 3,
+                      pointRadius: 4,
+                      pointHoverRadius: 6,
+                      fill: true,
+                      borderColor: "rgba(239,68,68,1)",
+                      backgroundColor: (ctx) => {
+                        const { ctx: c, chartArea } = ctx.chart;
+                        if (!chartArea) return "rgba(239,68,68,0.12)";
+                        const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                        g.addColorStop(0, "rgba(239,68,68,0.28)");
+                        g.addColorStop(1, "rgba(239,68,68,0.02)");
+                        return g;
+                      },
+                      spanGaps: true,
+                    }],
+                  }}
+                  options={options}
+                />
+              ) : (
+                <div className="small" style={{ paddingTop: 12 }}>
+                  No e1RM data yet for {ex}.
+                </div>
+              )}
+            </div>
+          </div>
         );
-      })()}
-    </div>
-  </div>
-);
       })}
     </div>
   );
