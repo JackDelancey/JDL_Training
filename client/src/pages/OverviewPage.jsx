@@ -4,6 +4,7 @@ import { Dashboard, Charts } from "../components/Dashboard";
 import { apiFetch } from "../utils/api";
 import { isoLocalNDaysAgo, isoLocalToday, formatDate, formatPrettyDate, formatPrettyDateTime } from "../utils/dates";
 import { fmt, e1rmFromTopReps, normalizeExerciseName } from "../utils/calcs";
+import { CoachClientView } from "../components/CoachClientView";
 
 function WeeksTable({ weekly, dailyOverview, unit, tracked }) {
   const cols = (tracked || []).slice(0, 6);
