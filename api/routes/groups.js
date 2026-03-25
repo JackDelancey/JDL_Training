@@ -297,6 +297,8 @@ router.get("/groups/:id/members", requireAuth, async (req, res) => {
   }
 });
 
+
+
 // ─── GET leaderboard ──────────────────────────────────────────────────
 
 router.get("/groups/:id/leaderboard", requireAuth, async (req, res) => {
@@ -336,7 +338,16 @@ router.get("/groups/:id/leaderboard", requireAuth, async (req, res) => {
       if (!rowsByUser.has(r.user_id)) rowsByUser.set(r.user_id, []);
       rowsByUser.get(r.user_id).push(r);
     }
-
+    // Add this BEFORE the rows.map() in GET /groups/:id/leaderboard:
+const latestBwByUser = new Map();
+for (const row of dailyRows) {
+  const bw = Number(row.bodyweight);
+  if (!Number.isFinite(bw) || bw <= 0) continue;
+  const existing = latestBwByUser.get(String(row.user_id));
+  if (!existing || String(row.entry_date) > String(existing.date)) {
+    latestBwByUser.set(String(row.user_id), { bw, date: String(row.entry_date) });
+  }
+}
     const rows = members.map((m) => {
       const userDailyRows = rowsByUser.get(m.user_id) || [];
       const userWeekly = weeklyQ.rows.filter((r) => String(r.user_id) === String(m.user_id));
@@ -345,7 +356,8 @@ router.get("/groups/:id/leaderboard", requireAuth, async (req, res) => {
       if (type === "strength") {
   let best = null;
   for (const row of userDailyRows) {
-    const bw = Number(row.bodyweight);
+    const bwData = latestBwByUser.get(String(m.user_id));
+    const bwClean = bwData?.bw ?? null;
     for (const mt of buildMetricRowsFromEntries(row.entries)) {
       if (normalizeExerciseName(mt.exercise) !== exNorm) continue;
       if (!Number.isFinite(mt.e1rm)) continue;
@@ -354,8 +366,8 @@ router.get("/groups/:id/leaderboard", requireAuth, async (req, res) => {
           score: mt.e1rm,
           meta: {
             date: safeDateLabel(row.entry_date),
-            bodyweight: Number.isFinite(bw) && bw > 0 ? bw : null,
-            wilks: Number.isFinite(bw) && bw > 0 ? wilksScore(bw, mt.e1rm) : null,
+            bodyweight: bwClean,
+            wilks: bwClean ? wilksScore(bwClean, mt.e1rm) : null,
           },
         };
       }
