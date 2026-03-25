@@ -3,7 +3,7 @@ import { apiFetch } from "../utils/api";
 
 export function Banner({ text }) {
   return (
-    <div className="card" style={{ borderColor: "#7f1d1d", marginBottom: 14 }}>
+    <div className="banner-error">
       <b>Error:</b> {text}
     </div>
   );
@@ -11,7 +11,7 @@ export function Banner({ text }) {
 
 export function Notice({ text, onDismiss, actions }) {
   return (
-    <div className="card" style={{ borderColor: "#1f3a8a", marginBottom: 14 }}>
+    <div className="notice">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <div><b>Note:</b> {text}</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

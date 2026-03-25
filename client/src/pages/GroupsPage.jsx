@@ -4,7 +4,6 @@ import { apiFetch } from "../utils/api";
 import { isoLocalToday, isoLocalNDaysAgo, formatPrettyDate, timeAgo } from "../utils/dates";
 import { fmt, normalizeExerciseName } from "../utils/calcs";
 import { Line } from "react-chartjs-2";
-import { isoLocalToday, isoLocalNDaysAgo, formatPrettyDate, timeAgo } from "../utils/dates";
 
 function eventSummaryText(event, unit) {
   const type = event?.event_type || "";

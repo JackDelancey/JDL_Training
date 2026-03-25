@@ -9,6 +9,16 @@ import GroupsPage from "./pages/GroupsPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import SettingsPage from "./pages/SettingsPage";
 
+const NAV = [
+  { id: "overview",    label: "Overview",   icon: "⊞" },
+  { id: "daily",       label: "Daily",       icon: "⊟" },
+  { id: "programs",    label: "Programs",    icon: "⊠" },
+  { id: "explorer",    label: "Explorer",    icon: "⊙" },
+  { id: "connections", label: "Connections", icon: "⊕" },
+  { id: "groups",      label: "Groups",      icon: "⊗" },
+  { id: "settings",    label: "Settings",    icon: "⊖" },
+];
+
 function Shell() {
   const { token, setToken, me, err, showWizard, setShowWizard, hardLogout, refresh, page, setPage } = useApp();
 
@@ -21,26 +31,16 @@ function Shell() {
             <img src="/brand/jdl-logo.png" alt="JDL logo" />
             <div>
               <div className="brandTitle">JDL Training</div>
-              <div className="small">Weekly logging • e1RM trends • group comparisons</div>
+              <div className="small">Track • Compete • Improve</div>
             </div>
           </div>
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 20 }}>
             <Auth onAuthed={(t) => { localStorage.setItem("jdl_token", t); setToken(t); }} />
           </div>
         </div>
       </div>
     );
   }
-
-  const NAV = [
-    { id: "overview",     label: "Overview" },
-    { id: "daily",        label: "Daily" },
-    { id: "programs",     label: "Programs" },
-    { id: "explorer",     label: "Explorer" },
-    { id: "connections",  label: "Connections" },
-    { id: "groups",       label: "Groups" },
-    { id: "settings",     label: "Settings" },
-  ];
 
   return (
     <>
@@ -49,10 +49,9 @@ function Shell() {
           token={token}
           onComplete={() => { setShowWizard(false); refresh(); }}
           onInvalidToken={() => hardLogout("Session expired — please log in again.")}
-          onError={(msg) => {}}
+          onError={() => {}}
         />
       )}
-
       <div className="appShell">
         <aside className="sidebar">
           <div className="sidebarTop">
@@ -60,21 +59,27 @@ function Shell() {
               <img src="/brand/jdl-logo.png" alt="JDL logo" />
               <div>
                 <div className="brandTitle">JDL Training</div>
-                <div className="small">Weekly logging • e1RM trends • group comparisons</div>
+                <div className="small" style={{ fontSize: 11 }}>Track • Compete • Improve</div>
               </div>
             </div>
-            <div className="nav">
-              {NAV.map(({ id, label }) => (
-                <button key={id} className={page === id ? "navBtn active" : "navBtn"} onClick={() => setPage(id)}>{label}</button>
+            <nav className="nav">
+              {NAV.map(({ id, label, icon }) => (
+                <button key={id} className={page === id ? "navBtn active" : "navBtn"} onClick={() => setPage(id)}>
+                  <span style={{ marginRight: 8, opacity: 0.7, fontSize: 13 }}>{icon}</span>
+                  {label}
+                </button>
               ))}
-            </div>
+            </nav>
           </div>
           <div className="sidebarBottom">
-            <div className="small">Signed in as <b>{me?.name || me?.email}</b></div>
-            <button className="secondary" onClick={() => hardLogout("")} style={{ marginTop: 10 }}>Log out</button>
+            <div className="small" style={{ marginBottom: 10 }}>
+              Signed in as <b style={{ color: "rgba(255,255,255,0.85)" }}>{me?.name || me?.email}</b>
+            </div>
+            <button className="secondary" onClick={() => hardLogout("")} style={{ width: "100%", fontSize: 12 }}>
+              Log out
+            </button>
           </div>
         </aside>
-
         <main className="main">
           {err ? <Banner text={err} /> : null}
           {page === "overview"    && <OverviewPage />}
