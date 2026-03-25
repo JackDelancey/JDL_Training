@@ -24,43 +24,30 @@ ChartJS.register(
 const API = "https://jdl-training.onrender.com";
 
 async function apiFetch(path, { token, method = "GET", body, onInvalidToken } = {}) {
-  const authToken =
-    typeof token === "string"
-      ? token.trim()
-      : token && typeof token === "object"
-        ? String(token.access_token || token.token || "").trim()
-        : "";
-
-  const headers = {
-    Accept: "application/json",
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    ...(body ? { "Content-Type": "application/json" } : {}),
-  };
-
   const r = await fetch(API + path, {
     method,
-    headers,
+    headers: {
+      ...(token ? { Authorization: "Bearer " + token } : {}),
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  const text = await r.text();
   let j = {};
+
   try {
-    j = await r.json();
+    j = text ? JSON.parse(text) : {};
   } catch {
-    j = {};
+    j = { error: text || "Request failed" };
   }
 
-  if (
-    r.status === 401 ||
-    j?.error === "Invalid token" ||
-    j?.error === "Missing bearer token"
-  ) {
+  if (!r.ok && (j.error === "Invalid token" || r.status === 401)) {
     if (typeof onInvalidToken === "function") onInvalidToken();
-    throw new Error("Session expired — please log in again.");
   }
 
   if (!r.ok) {
-    throw new Error(j?.error || `Request failed (${r.status})`);
+    throw new Error(j.error || `HTTP ${r.status}`);
   }
 
   return j;

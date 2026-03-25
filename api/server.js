@@ -791,24 +791,27 @@ async function handleLogin(req, res) {
       return res.status(400).json({ error: "email and password required" });
     }
 
-    const token = await supabaseLogin(email, password);
-    const user = token?.access_token ? await supabaseGetUser(token.access_token) : null;
+    console.log("LOGIN ATTEMPT:", { email });
 
-    let profile = null;
-    try {
-      profile = user ? await upsertProfileFromUser(user, null) : null;
-    } catch (dbErr) {
-      console.error("Profile upsert failed during login:", dbErr);
-      return res.status(500).json({
-        error: "Profile upsert failed",
-        detail: String(dbErr.message || dbErr),
-      });
-    }
+    const token = await supabaseLogin(email, password);
+    console.log("SUPABASE LOGIN OK");
+
+    const user = token?.access_token
+      ? await supabaseGetUser(token.access_token)
+      : null;
+
+    console.log("SUPABASE GET USER OK:", !!user?.id);
+
+    const profile = user ? await upsertProfileFromUser(user, null) : null;
+    console.log("PROFILE UPSERT OK");
 
     return res.json({ token, profile });
   } catch (e) {
-    console.error("Login failed:", e);
-    return res.status(400).json({ error: String(e.message || e) });
+    console.error("LOGIN FAILED FULL ERROR:", e);
+    return res.status(400).json({
+      error: String(e?.message || e),
+      detail: e?.stack || null,
+    });
   }
 }
 
