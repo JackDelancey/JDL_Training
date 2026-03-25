@@ -16,6 +16,10 @@ const pool = new Pool({
   ssl: {
     rejectUnauthorized: false,
   },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+  keepAlive: true,
 });
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -789,16 +793,21 @@ async function handleLogin(req, res) {
 
     const token = await supabaseLogin(email, password);
     const user = token?.access_token ? await supabaseGetUser(token.access_token) : null;
-    const profile = user ? await upsertProfileFromUser(user, null) : null;
 
-    return res.json({
-      access_token: token?.access_token || null,
-      refresh_token: token?.refresh_token || null,
-      token_type: token?.token_type || "bearer",
-      expires_in: token?.expires_in || null,
-      profile,
-    });
+    let profile = null;
+    try {
+      profile = user ? await upsertProfileFromUser(user, null) : null;
+    } catch (dbErr) {
+      console.error("Profile upsert failed during login:", dbErr);
+      return res.status(500).json({
+        error: "Profile upsert failed",
+        detail: String(dbErr.message || dbErr),
+      });
+    }
+
+    return res.json({ token, profile });
   } catch (e) {
+    console.error("Login failed:", e);
     return res.status(400).json({ error: String(e.message || e) });
   }
 }
