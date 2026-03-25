@@ -1,7 +1,6 @@
 import { AppProvider, useApp } from "./context/AppContext";
 import { Auth, Banner } from "./components/Auth";
 import { OnboardingWizard } from "./components/OnboardingWizard";
-import { CoachClientView } from "../components/CoachClientView";
 import OverviewPage from "./pages/OverviewPage";
 import DailyPage from "./pages/DailyPage";
 import ProgramsPage from "./pages/ProgramsPage";
