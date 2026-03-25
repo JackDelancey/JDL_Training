@@ -820,6 +820,15 @@ app.post("/api/login", handleLogin);
 app.post("/api/auth/register", handleRegister);
 app.post("/api/auth/login", handleLogin);
 
+app.get("/api/debug/env", (req, res) => {
+  res.json({
+    supabase_url: process.env.SUPABASE_URL || null,
+    has_supabase_anon_key: !!process.env.SUPABASE_ANON_KEY,
+    database_url_prefix: process.env.DATABASE_URL
+      ? process.env.DATABASE_URL.slice(0, 80)
+      : null,
+  });
+});
 /* =====================
    Profile
 ===================== */
