@@ -266,6 +266,24 @@ export default function DailyPage() {
             />
           )}
           <div style={{ height: 10 }} />
+          <div className="grid grid-2" style={{ marginBottom: 14 }}>
+  <div className="field">
+    <label>Bodyweight ({unit})</label>
+    <input
+      value={day?.bodyweight ?? ""}
+      placeholder="e.g. 85"
+      onChange={(ev) => setDay((prev) => ({ ...prev, bodyweight: ev.target.value || null }))}
+    />
+  </div>
+  <div className="field">
+    <label>Sleep (h)</label>
+    <input
+      value={day?.sleep_hours ?? ""}
+      placeholder="e.g. 8"
+      onChange={(ev) => setDay((prev) => ({ ...prev, sleep_hours: ev.target.value || null }))}
+    />
+  </div>
+</div>
           {!day ? (
             <div className="small">No log saved yet. Copy the selected session or add manual rows.</div>
           ) : (
