@@ -87,6 +87,11 @@ const DEFAULT_EXERCISE_LIBRARY = [
   "Triceps Pushdown",
   "Lateral Raise",
 ];
+function formatChartDate(value) {
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return String(value);
+  return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
+}
 
 function fmt(v) {
   const n = Number(v);
@@ -1597,8 +1602,14 @@ function GroupCompareTab({
   onRefresh,
 }) {
   const labels = Array.isArray(compareData?.user_a?.history)
-    ? compareData.user_a.history.map((x) => x.label || x.date || "—")
-    : [];
+  ? compareData.user_a.history.map((x) => {
+      const raw = x.label || x.date;
+      if (!raw) return "—";
+      const d = new Date(raw);
+      if (!Number.isFinite(d.getTime())) return String(raw);
+      return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
+    })
+  : [];
 
   const userASeries = Array.isArray(compareData?.user_a?.history)
     ? compareData.user_a.history.map((x) =>
@@ -5494,33 +5505,33 @@ function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram }) {
   }, [dailyOverview, tracked]);
 
   const dailyLatestByExercise = useMemo(() => {
-    const out = {};
-    const sorted = [...(dailyOverview || [])].sort(
-      (a, b) => new Date(a.entry_date).getTime() - new Date(b.entry_date).getTime()
-    );
+  const out = {};
+  const sorted = [...(dailyOverview || [])].sort((a, b) => {
+    // Normalise before comparing
+    const aDate = String(a.entry_date || '').slice(0, 10);
+    const bDate = String(b.entry_date || '').slice(0, 10);
+    return aDate.localeCompare(bDate);
+  });
 
-    for (const ex of tracked || []) {
-      const norm = normalizeExerciseName(ex);
-      let latestVal = null;
+  for (const ex of tracked || []) {
+    const norm = normalizeExerciseName(ex);
+    let latestVal = null;
 
-      for (const day of sorted) {
-        const entries = Array.isArray(day?.entries) ? day.entries : [];
-        for (const e of entries) {
-          if (normalizeExerciseName(e?.exercise) !== norm) continue;
-
-          const val = e1rmFromTopReps(
-            e?.actual?.top ?? e?.top,
-            e?.actual?.reps ?? e?.reps
-          );
-          if (Number.isFinite(val)) latestVal = val;
-        }
+    for (const day of sorted) {
+      const entries = Array.isArray(day?.entries) ? day.entries : [];
+      for (const e of entries) {
+        if (normalizeExerciseName(e?.exercise) !== norm) continue;
+        const val = e1rmFromTopReps(
+          e?.actual?.top ?? e?.top,
+          e?.actual?.reps ?? e?.reps
+        );
+        if (Number.isFinite(val)) latestVal = val;
       }
-
-      out[ex] = latestVal;
     }
-
-    return out;
-  }, [dailyOverview, tracked]);
+    out[ex] = latestVal;
+  }
+  return out;
+}, [dailyOverview, tracked]);
 
   const nextWeek = useMemo(() => {
     const last = weekly?.length ? Number(weekly[weekly.length - 1]?.week_number) : null;
@@ -6033,9 +6044,12 @@ function Charts({ weekly, dailyOverview, unit, tracked }) {
           .sort((a, b) => a.date.localeCompare(b.date));
 
         const labels = [
-          ...allWeekNums.map((w) => `W${w}`),
-          ...dailyPoints.map((p) => p.date.slice(5)), // MM-DD
-        ];
+  ...allWeekNums.map((w) => `W${w}`),
+  ...dailyPoints.map((p) => {
+    const d = new Date(p.date);
+    return `${String(d.getUTCDate()).padStart(2,'0')}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${d.getUTCFullYear()}`;
+  }),
+];
 
         const series = [
           ...allWeekNums.map((w) => weeklyMap.get(w) ?? null),
