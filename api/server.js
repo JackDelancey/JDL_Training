@@ -3269,51 +3269,6 @@ async function createPrEventsForGroups({
   if (!groupIds.length) return;
 
   for (const groupId of groupIds) {
-    const exists = await pool.query(
-      `select 1
-         from public.group_events
-        where group_id=$1
-          and user_id=$2
-          and event_type='pr_e1rm'
-          and payload->>'exercise' = $3
-          and payload->>'date' = $4
-        limit 1`,
-      [groupId, userId, exercise, String(date)]
-    );
-
-    if (exists.rowCount > 0) continue;
-
-    await pool.query(
-      `insert into public.group_events
-         (group_id, user_id, event_type, payload, created_at)
-       values
-         ($1, $2, 'pr_e1rm', $3::jsonb, now())`,
-      [
-        groupId,
-        userId,
-        JSON.stringify({
-          exercise,
-          e1rm,
-          top,
-          reps,
-          date,
-        }),
-      ]
-    );
-  }
-}
-async function createPrEventsForGroups({
-  userId,
-  exercise,
-  e1rm,
-  top,
-  reps,
-  date,
-}) {
-  const groupIds = await getUserGroupIds(userId);
-  if (!groupIds.length) return;
-
-  for (const groupId of groupIds) {
     await pool.query(
       `insert into public.group_events
          (group_id, user_id, event_type, payload, created_at)
@@ -3896,7 +3851,7 @@ app.post("/api/groups/:id/challenges", requireAuth, async (req, res) => {
 
     const q = await pool.query(
       `insert into public.group_challenges
-        (group_id, created_by_user_id, name, description, metric_type, exercise, scoring_type, start_date, end_date)
+        (group_id, created_by, name, description, metric_type, exercise, scoring_type, start_date, end_date)
        values ($1,$2,$3,$4,$5,$6,$7,$8::date,$9::date)
        returning id, group_id, created_by_user_id, name, description, metric_type, exercise, scoring_type, start_date, end_date, created_at`,
       [
@@ -3939,7 +3894,7 @@ app.get("/api/groups/:id/challenges", requireAuth, async (req, res) => {
               au.email as created_by_email
        from public.group_challenges gc
        join public.app_users au
-         on au.id = gc.created_by_user_id
+         on au.id = gc.created_by
        where gc.group_id=$1
        order by gc.created_at desc`,
       [groupId]
