@@ -3310,7 +3310,7 @@ async function getPreviousBestE1rm(userId, exercise, excludeDate = null) {
     for (const e of entries) {
       if (normalizeExerciseName(e?.exercise) !== norm) continue;
 
-      const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+      const top = parseLoadNumber(e?.actual?.top ?? e?.top);
       const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
       const val = e1rmEpley(top, reps);
 
@@ -3458,13 +3458,13 @@ async function getGroupMemberIds(groupId) {
 }
 
 function computeE1rmFromEntry(e) {
-  const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+  const top = parseLoadNumber(e?.actual?.top ?? e?.top);
   const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
   return e1rmEpley(top, reps);
 }
 
 function sumVolumeFromEntry(e) {
-  const top = parseTrainingLoad(e?.actual?.top ?? e?.top, q.rows[0]?.bodyweight ?? null);
+  const top = parseLoadNumber(e?.actual?.top ?? e?.top);
   const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
   if (!Number.isFinite(top) || !Number.isFinite(reps)) return null;
   return top * reps;
