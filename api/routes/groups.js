@@ -65,6 +65,19 @@ async function getDailyRowsForUsers(userIds, fromDate = null) {
   return q.rows;
 }
 
+function wilksScore(bodyweight, total, isMale = true) {
+  if (!Number.isFinite(bodyweight) || !Number.isFinite(total) || bodyweight <= 0 || total <= 0) return null;
+  // Wilks coefficients (male)
+  const a = isMale
+    ? [-216.0475144, 16.2606339, -0.002388645, -0.00113732, 7.01863e-6, -1.291e-8]
+    : [-594.31747775582, 27.23842536447, 0.82112226871, -0.00930733913, 4.731582e-5, -9.054e-8];
+  const bw = bodyweight;
+  const denom = a[0] + a[1]*bw + a[2]*bw**2 + a[3]*bw**3 + a[4]*bw**4 + a[5]*bw**5;
+  if (!Number.isFinite(denom) || denom === 0) return null;
+  return Math.round((500 / denom) * total * 100) / 100;
+}
+
+
 // ─── GET my groups ────────────────────────────────────────────────────
 
 router.get("/groups", requireAuth, async (req, res) => {
@@ -330,14 +343,24 @@ router.get("/groups/:id/leaderboard", requireAuth, async (req, res) => {
       let result = null;
 
       if (type === "strength") {
-        let best = null;
-        for (const row of userDailyRows) {
-          for (const mt of buildMetricRowsFromEntries(row.entries)) {
-            if (normalizeExerciseName(mt.exercise) !== exNorm) continue;
-            if (!Number.isFinite(mt.e1rm)) continue;
-            if (!best || mt.e1rm > best.score) best = { score: mt.e1rm, meta: { date: safeDateLabel(row.entry_date) } };
-          }
-        }
+  let best = null;
+  for (const row of userDailyRows) {
+    const bw = Number(row.bodyweight);
+    for (const mt of buildMetricRowsFromEntries(row.entries)) {
+      if (normalizeExerciseName(mt.exercise) !== exNorm) continue;
+      if (!Number.isFinite(mt.e1rm)) continue;
+      if (!best || mt.e1rm > best.score) {
+        best = {
+          score: mt.e1rm,
+          meta: {
+            date: safeDateLabel(row.entry_date),
+            bodyweight: Number.isFinite(bw) && bw > 0 ? bw : null,
+            wilks: Number.isFinite(bw) && bw > 0 ? wilksScore(bw, mt.e1rm) : null,
+          },
+        };
+      }
+    }
+  }
         for (const row of userWeekly) {
           for (const e of safeJsonArray(row.entries)) {
             if (normalizeExerciseName(e?.exercise) !== exNorm) continue;

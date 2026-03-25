@@ -4,6 +4,7 @@ import { apiFetch } from "../utils/api";
 import { isoLocalToday, isoLocalNDaysAgo, formatPrettyDate, timeAgo } from "../utils/dates";
 import { fmt, normalizeExerciseName } from "../utils/calcs";
 import { Line } from "react-chartjs-2";
+import { isoLocalToday, isoLocalNDaysAgo, formatPrettyDate, timeAgo } from "../utils/dates";
 
 function eventSummaryText(event, unit) {
   const type = event?.event_type || "";
@@ -47,13 +48,17 @@ function FeedTab({ events, unit }) {
 
 function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExercise, setLbExercise, lbWindow, setLbWindow }) {
   const rows = Array.isArray(leaderboard?.rows) ? leaderboard.rows : [];
+  const showBodyweight = lbType === "strength" || lbType === "relative_strength";
+
   return (
     <div>
       <div className="grid grid-3">
         <div className="field">
           <label>Leaderboard</label>
           <select value={lbType} onChange={(e) => setLbType(e.target.value)}>
-            {["strength","improvement","adherence","relative_strength","volume","streak"].map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
+            {["strength","improvement","adherence","relative_strength","volume","streak"].map((t) => (
+              <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1).replace("_", " ")}</option>
+            ))}
           </select>
         </div>
         <div className="field">
@@ -65,7 +70,9 @@ function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExerc
         <div className="field">
           <label>Window</label>
           <select value={lbWindow} onChange={(e) => setLbWindow(e.target.value)}>
-            {["14d","30d","60d","90d","all"].map((w) => <option key={w} value={w}>{w === "all" ? "All time" : w}</option>)}
+            {["14d","30d","60d","90d","all"].map((w) => (
+              <option key={w} value={w}>{w === "all" ? "All time" : w}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -73,14 +80,25 @@ function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExerc
       {rows.length ? (
         <div style={{ overflowX: "auto" }}>
           <table>
-            <thead><tr><th>Rank</th><th>Athlete</th><th>{scoreLabel(lbType, lbExercise, unit)}</th><th>Detail</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Athlete</th>
+                <th>{scoreLabel(lbType, lbExercise, unit)}</th>
+                {showBodyweight && <th>Bodyweight ({unit})</th>}
+                {lbType === "strength" && <th>Wilks</th>}
+                <th>Date</th>
+              </tr>
+            </thead>
             <tbody>
               {rows.map((r, idx) => (
                 <tr key={r.user_id || idx}>
                   <td>{r.rank ?? idx + 1}</td>
                   <td>{r.name || r.email || "—"}</td>
                   <td>{Number.isFinite(Number(r.score)) ? (lbType === "adherence" ? `${fmt(r.score)}%` : fmt(r.score)) : "—"}</td>
-                  <td>{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.note || r.meta?.week ? `Week ${r.meta.week}` : "—"}</td>
+                  {showBodyweight && <td>{r.meta?.bodyweight != null ? `${fmt(r.meta.bodyweight)} ${unit}` : "—"}</td>}
+                  {lbType === "strength" && <td>{r.meta?.wilks != null ? fmt(r.meta.wilks) : "—"}</td>}
+                  <td>{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.week ? `Week ${r.meta.week}` : "—"}</td>
                 </tr>
               ))}
             </tbody>
