@@ -89,28 +89,79 @@ async function supabaseSignup(email, password, name) {
 }
 
 async function supabaseLogin(email, password) {
-  const url = `${SUPABASE_URL}/auth/v1/token?grant_type=password`;
-  const r = await fetch(url, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-  });
+  const url = `${String(process.env.SUPABASE_URL || "").trim()}/auth/v1/token?grant_type=password`;
 
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) {
-    const msg =
-      json?.error_description ||
-      json?.msg ||
-      json?.message ||
-      JSON.stringify(json);
-    throw new Error(`Supabase login failed: ${msg}`);
+  console.log("SUPABASE LOGIN URL:", url);
+  console.log("SUPABASE ANON KEY PRESENT:", !!process.env.SUPABASE_ANON_KEY);
+
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: {
+        apikey: String(process.env.SUPABASE_ANON_KEY || "").trim(),
+        Authorization: `Bearer ${String(process.env.SUPABASE_ANON_KEY || "").trim()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const raw = await r.text();
+    console.log("SUPABASE LOGIN STATUS:", r.status);
+    console.log("SUPABASE LOGIN RAW:", raw);
+
+    let json = {};
+    try {
+      json = raw ? JSON.parse(raw) : {};
+    } catch {
+      json = { raw };
+    }
+
+    if (!r.ok) {
+      const msg =
+        json?.error_description ||
+        json?.msg ||
+        json?.message ||
+        raw ||
+        `Supabase login failed with ${r.status}`;
+      throw new Error(msg);
+    }
+
+    return json;
+  } catch (e) {
+    console.error("SUPABASE LOGIN FETCH FAILED:", e);
+    console.error("SUPABASE LOGIN FETCH CAUSE:", e?.cause);
+    throw e;
   }
-  return json;
 }
+
+app.get("/api/debug/supabase-auth", async (req, res) => {
+  const base = String(process.env.SUPABASE_URL || "").trim();
+  const url = `${base}/auth/v1/settings`;
+
+  try {
+    const r = await fetch(url, {
+      method: "GET",
+      headers: {
+        apikey: String(process.env.SUPABASE_ANON_KEY || "").trim(),
+      },
+    });
+
+    const raw = await r.text();
+
+    res.status(200).json({
+      ok: r.ok,
+      status: r.status,
+      url,
+      raw,
+    });
+  } catch (e) {
+    res.status(500).json({
+      error: String(e?.message || e),
+      cause: e?.cause ? String(e.cause) : null,
+      url,
+    });
+  }
+});
 
 /* =====================
    Generic helpers
