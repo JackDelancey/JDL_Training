@@ -4,7 +4,6 @@ import { apiFetch } from "../utils/api";
 import { formatPrettyDate } from "../utils/dates";
 import { sumWeeks, draftKey, hasDraft } from "../utils/calcs";
 import { Notice } from "../components/Auth";
-import { useApp } from "../context/AppContext";
 
 
 // ─── Schedule Editor ──────────────────────────────────────────────────
