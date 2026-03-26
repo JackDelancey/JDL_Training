@@ -17,7 +17,7 @@ function isoLocalToday() {
 // ─── GET /api/mobile/today ────────────────────────────────────────────
 // Returns today's session from the active program + any logged daily entries
 
-router.get("/mobile/today", requireAuth, async (req, res) => {
+router.get("/today", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
     const today = isoLocalToday();
@@ -148,7 +148,7 @@ router.get("/mobile/today", requireAuth, async (req, res) => {
 // ─── GET /api/mobile/program-sessions ────────────────────────────────
 // Returns all sessions from the active program for the session picker
 
-router.get("/mobile/program-sessions", requireAuth, async (req, res) => {
+router.get("/program-sessions", requireAuth, async (req, res) => {
   try {
     const userId = req.user.id;
 
