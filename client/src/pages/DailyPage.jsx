@@ -219,48 +219,35 @@ export default function DailyPage() {
             <div className="small">Loading…</div>
           ) : isTraining ? (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    {displayPlan?.block_number
-                      ? `Block ${displayPlan.block_number} • W${displayPlan.block_week} • Day ${displayPlan.day_number}`
-                      : `Week ${displayPlan.week_number} • Day ${displayPlan.day_number}`}
-                    {displayPlan.day_title ? ` — ${displayPlan.day_title}` : ""}
-                  </div>
-                  <div className="small">{(displayPlan.rows || []).length} exercises planned</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>
+                  {displayPlan?.block_number
+                    ? `B${displayPlan.block_number} · W${displayPlan.block_week} · Day ${displayPlan.day_number}`
+                    : `W${displayPlan.week_number} · Day ${displayPlan.day_number}`}
+                  {displayPlan.day_title ? ` — ${displayPlan.day_title}` : ""}
                 </div>
-                <button className="secondary" style={{ fontSize: 12, padding: "6px 12px" }} onClick={copySelectedSession} disabled={busy}>
-                  Load session
+                <button className="secondary" style={{ fontSize: 11, padding: "5px 10px" }} onClick={copySelectedSession} disabled={busy}>
+                  Load →
                 </button>
               </div>
-              <div style={{ overflowX: "auto" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Exercise</th>
-                      <th>Sets × Reps</th>
-                      <th>Load</th>
-                      <th>Target</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(displayPlan.rows || []).map((r, i) => (
-                      <tr key={i}>
-                        <td style={{ fontWeight: 600 }}>{r.exercise}</td>
-                        <td>{r.sets_reps || "—"}</td>
-                        <td>{r.load_rpe || "—"}</td>
-                        <td>{r.week_target || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                {(displayPlan.rows || []).map((r, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "4px 8px", background: "var(--surface2)", borderRadius: 7, gap: 8 }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, minWidth: 0, flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.exercise}</div>
+                    <div className="small" style={{ whiteSpace: "nowrap", opacity: 0.7, fontSize: 11 }}>
+                      {[r.sets_reps, r.load_rpe, r.week_target].filter(Boolean).join(" · ") || "—"}
+                    </div>
+                  </div>
+                ))}
               </div>
             </>
           ) : (
-            <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>😴</div>
-              <div style={{ fontWeight: 600 }}>Rest day</div>
-              <div className="small">No session scheduled{plan?.reason ? ` (${plan.reason})` : ""}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
+              <span style={{ fontSize: 20 }}>😴</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Rest day</div>
+                <div className="small">{plan?.reason || "No session scheduled"}</div>
+              </div>
             </div>
           )}
         </div>
@@ -362,56 +349,53 @@ export default function DailyPage() {
                 <div key={idx} style={{
                   background: e.completed ? "rgba(16,185,129,0.06)" : "var(--surface2)",
                   border: `1px solid ${e.completed ? "rgba(16,185,129,0.2)" : "var(--border)"}`,
-                  borderRadius: 12, padding: 14,
+                  borderRadius: 10, padding: "10px 12px",
                   transition: "all 0.15s ease",
                 }}>
                   {/* Exercise header */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{e.exercise}</div>
-                      {e?.source === "program" && e?.planned?.sets_reps && (
-                        <div className="small">
-                          {e.planned.sets_reps}
-                          {e.planned.load_rpe ? ` @ ${e.planned.load_rpe}` : ""}
-                          {e.planned.target ? ` — target: ${e.planned.target}` : ""}
-                        </div>
-                      )}
-                      {last && (
-                        <div className="small" style={{ color: "var(--text3)", marginTop: 2 }}>
-                          Last: <b>{fmt(last.top)} × {last.reps}</b> ({formatPrettyDate(last.date)})
-                          {hx.best_all_time_e1rm != null && <> • Best e1RM: <b>{fmt(hx.best_all_time_e1rm)} {unit}</b></>}
-                        </div>
-                      )}
-                    </div>
-                    <button className="secondary" style={{ fontSize: 11, padding: "3px 8px", flexShrink: 0 }} onClick={() => removeEntry(idx)}>✕</button>
-                  </div>
-
-                  {/* Inputs */}
-                  <div style={{ display: "grid", gridTemplateColumns: showRpe ? "1fr 1fr 1fr" : "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                    <div className="field">
-                      <label>Top ({unit})</label>
-                      <input value={e?.actual?.top ?? ""} onChange={(ev) => setActual(idx, { top: ev.target.value })} placeholder="—" />
-                    </div>
-                    <div className="field">
-                      <label>Reps</label>
-                      <input value={e?.actual?.reps ?? ""} onChange={(ev) => setActual(idx, { reps: ev.target.value })} placeholder="—" />
-                    </div>
-                    {showRpe && (
-                      <div className="field">
-                        <label>RPE</label>
-                        <input value={e?.actual?.rpe ?? ""} onChange={(ev) => setActual(idx, { rpe: ev.target.value })} placeholder="—" />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                        {e.exercise}
+                        {e?.source === "program" && e?.planned?.sets_reps && (
+                          <span style={{ fontWeight: 400, fontSize: 11, opacity: 0.6 }}>
+                            {e.planned.sets_reps}{e.planned.load_rpe ? ` @ ${e.planned.load_rpe}` : ""}{e.planned.target ? ` · ${e.planned.target}` : ""}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      {last && (
+                        <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
+                          Last: <b>{fmt(last.top)} × {last.reps}</b>{hx.best_all_time_e1rm != null ? ` · Best: ${fmt(hx.best_all_time_e1rm)} ${unit}` : ""}
+                        </div>
+                      )}
+                    </div>
+                    <button className="secondary" style={{ fontSize: 10, padding: "2px 7px", flexShrink: 0 }} onClick={() => removeEntry(idx)}>✕</button>
                   </div>
 
-                  {/* Footer */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                  {/* Inputs + footer in one row */}
+                  <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: showRpe ? "80px 60px 60px" : "80px 60px", gap: 6 }}>
+                      <div className="field">
+                        <label style={{ fontSize: 10 }}>Top ({unit})</label>
+                        <input style={{ fontSize: 13, padding: "5px 8px" }} value={e?.actual?.top ?? ""} onChange={(ev) => setActual(idx, { top: ev.target.value })} placeholder="—" />
+                      </div>
+                      <div className="field">
+                        <label style={{ fontSize: 10 }}>Reps</label>
+                        <input style={{ fontSize: 13, padding: "5px 8px" }} value={e?.actual?.reps ?? ""} onChange={(ev) => setActual(idx, { reps: ev.target.value })} placeholder="—" />
+                      </div>
+                      {showRpe && (
+                        <div className="field">
+                          <label style={{ fontSize: 10 }}>RPE</label>
+                          <input style={{ fontSize: 13, padding: "5px 8px" }} value={e?.actual?.rpe ?? ""} onChange={(ev) => setActual(idx, { rpe: ev.target.value })} placeholder="—" />
+                        </div>
+                      )}
+                    </div>
+                    <input style={{ flex: 1, minWidth: 100, fontSize: 11, padding: "5px 8px" }} placeholder="Notes…" value={e?.notes ?? ""} onChange={(ev) => setEntry(idx, { notes: ev.target.value })} />
+                    <label style={{ display: "flex", gap: 5, alignItems: "center", cursor: "pointer", whiteSpace: "nowrap" }}>
                       <input type="checkbox" checked={!!e.completed} onChange={(ev) => setEntry(idx, { completed: ev.target.checked })} />
-                      <span className="small">Done</span>
+                      <span style={{ fontSize: 11, color: "var(--text2)" }}>Done</span>
                     </label>
-                    <input style={{ flex: 1, minWidth: 140, fontSize: 12, padding: "5px 8px" }} placeholder="Notes…" value={e?.notes ?? ""} onChange={(ev) => setEntry(idx, { notes: ev.target.value })} />
-                    {e1rm && <div className="small" style={{ color: "rgba(232,25,44,0.8)", fontWeight: 700, whiteSpace: "nowrap" }}>e1RM {fmt(e1rm)}</div>}
+                    {e1rm && <div style={{ fontSize: 11, color: "rgba(232,25,44,0.85)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(e1rm)}</div>}
                   </div>
                 </div>
               );
