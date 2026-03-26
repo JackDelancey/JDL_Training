@@ -9,7 +9,7 @@ npm i
 npm run dev
 
 cd jdl-training-mobile
-npx expo start
+npx expo start --clear
 
 git add .
 git commit -m "fix api issues"
