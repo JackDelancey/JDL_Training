@@ -222,12 +222,14 @@ export default function DailyPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 13 }}>
                   {displayPlan?.block_number
-                    ? `B${displayPlan.block_number} · W${displayPlan.block_week} · Day ${displayPlan.day_number}`
-                    : `W${displayPlan.week_number} · Day ${displayPlan.day_number}`}
-                  {displayPlan.day_title ? ` — ${displayPlan.day_title}` : ""}
+                    ? `B${displayPlan.block_number} · W${displayPlan.block_week ?? "?"} · Day ${displayPlan.day_number ?? "?"}`
+                    : displayPlan?.week_number
+                      ? `W${displayPlan.week_number} · Day ${displayPlan.day_number ?? "?"}`
+                      : "Today's session"}
+                  {displayPlan?.day_title && displayPlan.day_title !== "undefined" ? ` — ${displayPlan.day_title}` : ""}
                 </div>
-                <button className="secondary" style={{ fontSize: 11, padding: "5px 10px" }} onClick={copySelectedSession} disabled={busy}>
-                  Load →
+                <button style={{ fontSize: 12, padding: "6px 14px", background: "linear-gradient(180deg,rgba(232,25,44,0.95),rgba(200,15,35,0.9))", borderColor: "rgba(232,25,44,0.6)", color: "#fff", fontWeight: 700 }} onClick={copySelectedSession} disabled={busy}>
+                  Load session
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
