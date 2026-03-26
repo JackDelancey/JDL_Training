@@ -88,12 +88,11 @@ function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExerc
                   {r.rank ?? idx + 1}
                 </td>
                 <td style={{ fontWeight: 600 }}>{r.name || r.email || "—"}</td>
-                <td>{Number.isFinite(Number(r.score)) ? (lbType === "adherence" ? `${fmt(r.score)}%` : fmt(r.score)) : "—"}</td>
-<td>{r.meta?.top != null ? `${fmt(r.meta.top)} × ${r.meta?.reps ?? "?"}` : "—"}</td>  {/* ← add this */}
+                <td>{Number.isFinite(Number(r.score)) ? fmt(r.score) : "—"}</td>
+<td>{r.meta?.top != null ? `${fmt(r.meta.top)} × ${r.meta?.reps ?? "?"}` : "—"}</td>
 {showBw && <td>{r.meta?.bodyweight != null ? fmt(r.meta.bodyweight) : "—"}</td>}
-                {showBw && <td>{r.meta?.bodyweight != null ? fmt(r.meta.bodyweight) : "—"}</td>}
-                {lbType === "strength" && <td>{r.meta?.wilks != null ? fmt(r.meta.wilks) : "—"}</td>}
-                <td className="small">{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.week ? `W${r.meta.week}` : "—"}</td>
+{lbType === "strength" && <td>{r.meta?.wilks != null ? fmt(r.meta.wilks) : "—"}</td>}
+<td className="small">{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.week ? `W${r.meta.week}` : "—"}</td>
               </tr>
             ))}
           </tbody>
