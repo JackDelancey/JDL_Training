@@ -365,10 +365,12 @@ for (const row of dailyRows) {
         best = {
           score: mt.e1rm,
           meta: {
-            date: safeDateLabel(row.entry_date),
-            bodyweight: bwClean,
-            wilks: bwClean ? wilksScore(bwClean, mt.e1rm) : null,
-          },
+    date: safeDateLabel(row.entry_date),
+    top: mt.top ?? null,        // ← add
+    reps: mt.reps ?? null,      // ← add
+    bodyweight: bwClean,
+    wilks: bwClean ? wilksScore(bwClean, mt.e1rm) : null,
+  },
         };
       }
     }

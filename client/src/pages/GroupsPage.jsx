@@ -75,6 +75,7 @@ function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExerc
               <th style={{ width: 40 }}>#</th>
               <th>Athlete</th>
               <th>{scoreLabel(lbType, lbExercise, unit)}</th>
+              <th>Top set</th>
               {showBw && <th>BW ({unit})</th>}
               {lbType === "strength" && <th>Wilks</th>}
               <th>Date</th>
@@ -88,6 +89,8 @@ function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExerc
                 </td>
                 <td style={{ fontWeight: 600 }}>{r.name || r.email || "—"}</td>
                 <td>{Number.isFinite(Number(r.score)) ? (lbType === "adherence" ? `${fmt(r.score)}%` : fmt(r.score)) : "—"}</td>
+<td>{r.meta?.top != null ? `${fmt(r.meta.top)} × ${r.meta?.reps ?? "?"}` : "—"}</td>  {/* ← add this */}
+{showBw && <td>{r.meta?.bodyweight != null ? fmt(r.meta.bodyweight) : "—"}</td>}
                 {showBw && <td>{r.meta?.bodyweight != null ? fmt(r.meta.bodyweight) : "—"}</td>}
                 {lbType === "strength" && <td>{r.meta?.wilks != null ? fmt(r.meta.wilks) : "—"}</td>}
                 <td className="small">{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.week ? `W${r.meta.week}` : "—"}</td>
