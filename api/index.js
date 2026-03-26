@@ -4,6 +4,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { ensureSchema } = require("./db");
+const mobileRoutes = require("./routes/mobile");
 
 const app = express();
 app.use(cors());
@@ -31,6 +32,7 @@ app.use("/api", require("./routes/exercises"));
 app.use("/api", require("./routes/groups"));
 app.use("/api", require("./routes/connections"));
 app.use("/api", require("./routes/coach"));
+app.use("/api/mobile", mobileRoutes);
 
 // ─── Boot ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;
