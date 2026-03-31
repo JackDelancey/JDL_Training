@@ -4,17 +4,14 @@ import { CoachClientView } from "../components/CoachClientView";
 import { Dashboard, Charts } from "../components/Dashboard";
 import { apiFetch } from "../utils/api";
 import { isoLocalNDaysAgo, isoLocalToday, formatPrettyDate } from "../utils/dates";
-import { fmt } from "../utils/calcs";
-
-// ─── Today's session status ───────────────────────────────────────────
+import { fmt, toDisplayUnit, toStorageKg } from "../utils/calcs";
 
 function TodayCard({ token, onInvalidToken, onError, onGoToDaily }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
     if (!token) return;
-    const today = isoLocalToday();
-    apiFetch(`/api/programs/active/plan?date=${today}`, { token, onInvalidToken })
+    apiFetch(`/api/programs/active/plan?date=${isoLocalToday()}`, { token, onInvalidToken })
       .then(setData).catch(() => setData(null));
   }, [token]);
 
@@ -23,10 +20,7 @@ function TodayCard({ token, onInvalidToken, onError, onGoToDaily }) {
   if (!data.is_training_day) {
     return (
       <div className="card" style={{ background: "var(--surface2)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <div>
-          <div style={{ fontWeight: 700 }}>Rest day</div>
-          <div className="small">No session scheduled today</div>
-        </div>
+        <div><div style={{ fontWeight: 700 }}>Rest day</div><div className="small">No session scheduled today</div></div>
         <span style={{ fontSize: 24 }}>😴</span>
       </div>
     );
@@ -38,16 +32,12 @@ function TodayCard({ token, onInvalidToken, onError, onGoToDaily }) {
         <div style={{ fontWeight: 700 }}>Today — Block {data.block_number} • Week {data.block_week} • Day {data.day_number}</div>
         <div className="small">{data.day_title} • {(data.rows || []).length} exercises planned</div>
       </div>
-      <button onClick={onGoToDaily} style={{ fontSize: 13, padding: "8px 16px" }}>
-        Open session →
-      </button>
+      <button onClick={onGoToDaily} style={{ fontSize: 13, padding: "8px 16px" }}>Open session →</button>
     </div>
   );
 }
 
-// ─── Adherence card ───────────────────────────────────────────────────
-
-function AdherenceCard({ token, onInvalidToken, onError }) {
+function AdherenceCard({ token, onInvalidToken }) {
   const [data, setData] = useState(null);
   const from = isoLocalNDaysAgo(13);
   const to = isoLocalToday();
@@ -77,17 +67,13 @@ function AdherenceCard({ token, onInvalidToken, onError }) {
           </div>
           <div className="small" style={{ marginTop: 6 }}>{completed} / {planned} sessions completed</div>
         </div>
-        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}>
-          {pct != null ? `${pct}%` : "—"}
-        </div>
+        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}>{pct != null ? `${pct}%` : "—"}</div>
       </div>
     </div>
   );
 }
 
-// ─── Program progress ─────────────────────────────────────────────────
-
-function ProgramCard({ token, onInvalidToken, onError }) {
+function ProgramCard({ token, onInvalidToken }) {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -117,8 +103,6 @@ function ProgramCard({ token, onInvalidToken, onError }) {
   );
 }
 
-// ─── Weekly log (collapsible) ─────────────────────────────────────────
-
 function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onError }) {
   const [open, setOpen] = useState(false);
   const [week, setWeek] = useState(1);
@@ -138,7 +122,17 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
 
   async function save() {
     try {
-      await apiFetch(`/api/weekly/${week}`, { token, method: "PUT", body: { unit, ...meta, entries }, onInvalidToken });
+      // Convert top sets from display unit back to kg before saving
+      const entriesToSave = entries.map((e) => ({
+        ...e,
+        top: e.top !== "" && e.top != null ? toStorageKg(e.top, unit) : e.top,
+      }));
+      const bwKg = meta.bodyweight !== "" ? toStorageKg(meta.bodyweight, unit) : "";
+      await apiFetch(`/api/weekly/${week}`, {
+        token, method: "PUT",
+        body: { unit: "kg", ...meta, bodyweight: bwKg, entries: entriesToSave },
+        onInvalidToken,
+      });
       onSaved();
       setOpen(false);
     } catch (e) { onError(e.message); }
@@ -146,9 +140,15 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
 
   async function autofill() {
     try {
-      const res = await apiFetch(`/api/weekly/from-daily/${week}`, { token, method: "POST", body: { unit }, onInvalidToken });
+      const res = await apiFetch(`/api/weekly/from-daily/${week}`, { token, method: "POST", body: { unit: "kg" }, onInvalidToken });
       if (Array.isArray(res.derived_entries)) {
-        setEntries(res.derived_entries.map((e) => ({ exercise: e.exercise, top: e.top ?? "", reps: e.reps ?? 3, rpe: e.rpe ?? "" })));
+        // Convert returned kg values to display unit
+        setEntries(res.derived_entries.map((e) => ({
+          exercise: e.exercise,
+          top: e.top != null ? toDisplayUnit(e.top, unit) : "",
+          reps: e.reps ?? 3,
+          rpe: e.rpe ?? "",
+        })));
       }
       onSaved();
     } catch (e) { onError(e.message); }
@@ -156,11 +156,8 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
 
   return (
     <div className="card">
-      <button
-        className="secondary"
-        onClick={() => setOpen((v) => !v)}
-        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
-      >
+      <button className="secondary" onClick={() => setOpen((v) => !v)}
+        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
         <div style={{ textAlign: "left" }}>
           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.93)" }}>Log a week</div>
           <div className="small">Record your top sets for the week</div>
@@ -172,7 +169,10 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
         <div style={{ marginTop: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
             <div className="field"><label>Week</label><input value={week} onChange={(e) => setWeek(e.target.value)} /></div>
-            <div className="field"><label>Bodyweight ({unit})</label><input value={meta.bodyweight} onChange={(e) => setMeta({ ...meta, bodyweight: e.target.value })} /></div>
+            <div className="field">
+              <label>Bodyweight ({unit})</label>
+              <input value={meta.bodyweight} onChange={(e) => setMeta({ ...meta, bodyweight: e.target.value })} />
+            </div>
             <div className="field"><label>Sleep (h)</label><input value={meta.sleep_hours} onChange={(e) => setMeta({ ...meta, sleep_hours: e.target.value })} /></div>
             <div className="field"><label>Pain (0–10)</label><input value={meta.pec_pain_0_10} onChange={(e) => setMeta({ ...meta, pec_pain_0_10: e.target.value })} /></div>
           </div>
@@ -200,8 +200,6 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
   );
 }
 
-// ─── Weeks table (collapsible) ────────────────────────────────────────
-
 function WeeksSection({ weekly, unit, tracked }) {
   const [open, setOpen] = useState(false);
   const cols = (tracked || []).slice(0, 6);
@@ -209,11 +207,8 @@ function WeeksSection({ weekly, unit, tracked }) {
 
   return (
     <div className="card">
-      <button
-        className="secondary"
-        onClick={() => setOpen((v) => !v)}
-        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
-      >
+      <button className="secondary" onClick={() => setOpen((v) => !v)}
+        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", border: "none", background: "transparent", padding: 0, cursor: "pointer" }}>
         <div style={{ textAlign: "left" }}>
           <div style={{ fontWeight: 700, color: "rgba(255,255,255,0.93)" }}>Weekly history</div>
           <div className="small">{weekly.length} weeks logged</div>
@@ -235,7 +230,8 @@ function WeeksSection({ weekly, unit, tracked }) {
                   <td>W{w.week_number}</td>
                   {cols.map((ex) => {
                     const n = Number(w?.metrics_by_exercise?.[ex]?.e1rm);
-                    return <td key={ex}>{Number.isFinite(n) ? `${fmt(n)} ${unit}` : "—"}</td>;
+                    const display = Number.isFinite(n) ? toDisplayUnit(n, unit) : null;
+                    return <td key={ex}>{display != null ? `${fmt(display)} ${unit}` : "—"}</td>;
                   })}
                 </tr>
               ))}
@@ -247,9 +243,7 @@ function WeeksSection({ weekly, unit, tracked }) {
   );
 }
 
-// ─── Groups mini ──────────────────────────────────────────────────────
-
-function GroupsMini({ token, onInvalidToken, onError }) {
+function GroupsMini({ token, onInvalidToken }) {
   const [groups, setGroups] = useState([]);
 
   useEffect(() => {
@@ -276,8 +270,6 @@ function GroupsMini({ token, onInvalidToken, onError }) {
   );
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────
-
 export default function OverviewPage() {
   const { me, token, unit, tracked, dashboardExercises, weekly, dailyOverview, activeProgram, onInvalidToken, setErr, refresh, setPage } = useApp();
 
@@ -285,7 +277,6 @@ export default function OverviewPage() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <CoachClientView token={token} unit={unit} onInvalidToken={onInvalidToken} onError={setErr} />
 
-      {/* Hero metrics */}
       <div>
         <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <h2 style={{ margin: 0 }}>Overview</h2>
@@ -294,23 +285,19 @@ export default function OverviewPage() {
         <Dashboard weekly={weekly} dailyOverview={dailyOverview} unit={unit} tracked={dashboardExercises} activeProgram={activeProgram} />
       </div>
 
-      {/* Today + program row */}
       <div className="grid grid-2">
         <TodayCard token={token} onInvalidToken={onInvalidToken} onError={setErr} onGoToDaily={() => setPage("daily")} />
-        <ProgramCard token={token} onInvalidToken={onInvalidToken} onError={setErr} />
+        <ProgramCard token={token} onInvalidToken={onInvalidToken} />
       </div>
 
-      {/* Adherence */}
-      <AdherenceCard token={token} onInvalidToken={onInvalidToken} onError={setErr} />
+      <AdherenceCard token={token} onInvalidToken={onInvalidToken} />
 
-      {/* Charts */}
       <Charts weekly={weekly} dailyOverview={dailyOverview} unit={unit} tracked={dashboardExercises} activeProgram={activeProgram} />
 
-      {/* Secondary — collapsible */}
       <div className="grid grid-2">
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <WeeklyLogSection token={token} unit={unit} tracked={tracked} onSaved={refresh} onInvalidToken={onInvalidToken} onError={setErr} />
-          <GroupsMini token={token} onInvalidToken={onInvalidToken} onError={setErr} />
+          <GroupsMini token={token} onInvalidToken={onInvalidToken} />
         </div>
         <WeeksSection weekly={weekly} unit={unit} tracked={tracked} />
       </div>

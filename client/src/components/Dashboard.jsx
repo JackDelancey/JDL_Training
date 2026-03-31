@@ -4,7 +4,7 @@ import {
   Chart as ChartJS, LineElement, PointElement, CategoryScale,
   LinearScale, Tooltip, Legend, Filler,
 } from "chart.js";
-import { fmt, e1rmFromTopReps, normalizeExerciseName } from "../utils/calcs";
+import { fmt, e1rmFromTopReps, normalizeExerciseName, toDisplayUnit } from "../utils/calcs";
 import { formatDate } from "../utils/dates";
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
@@ -33,6 +33,7 @@ const CHART_OPTIONS_BASE = {
 export function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram }) {
   const latest = useMemo(() => weekly?.length ? weekly[weekly.length - 1] : null, [weekly]);
 
+  // All e1RM values stored in kg — compute raw then convert for display
   const dailyBestByExercise = useMemo(() => {
     const out = {};
     for (const ex of tracked || []) {
@@ -91,10 +92,15 @@ export function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram 
         }
         if (found) break;
       }
+      // Convert planned value for display
+      if (found != null) {
+        const n = Number(found);
+        found = Number.isFinite(n) ? String(fmt(toDisplayUnit(n, unit))) : found;
+      }
       out[ex] = found;
     }
     return out;
-  }, [activeProgram, tracked, nextWeek]);
+  }, [activeProgram, tracked, nextWeek, unit]);
 
   const top3 = (tracked || []).slice(0, 3);
 
@@ -108,14 +114,17 @@ export function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram 
           const vals = (weekly || []).map((w) => Number(w?.metrics_by_exercise?.[ex]?.e1rm)).filter(Number.isFinite);
           return vals.length ? Math.max(...vals) : null;
         })();
-        const latestVal = [weeklyLatest, dailyLatest].filter(Number.isFinite).reduce((a, b) => Math.max(a, b), -Infinity);
-        const bestVal = [weeklyBest, dailyBest].filter(Number.isFinite).reduce((a, b) => Math.max(a, b), -Infinity);
+        // Raw kg values — convert for display
+        const latestKg = [weeklyLatest, dailyLatest].filter(Number.isFinite).reduce((a, b) => Math.max(a, b), -Infinity);
+        const bestKg = [weeklyBest, dailyBest].filter(Number.isFinite).reduce((a, b) => Math.max(a, b), -Infinity);
+        const latestVal = Number.isFinite(latestKg) ? toDisplayUnit(latestKg, unit) : null;
+        const bestVal = Number.isFinite(bestKg) ? toDisplayUnit(bestKg, unit) : null;
 
         return (
           <div className="metric" key={ex}>
             <div className="k">{ex} e1RM (latest)</div>
-            <div className="v">{Number.isFinite(latestVal) ? fmt(latestVal) : "—"} <span className="small">{unit}</span></div>
-            <div className="s">Best: {Number.isFinite(bestVal) ? `${fmt(bestVal)} ${unit}` : "—"}</div>
+            <div className="v">{latestVal != null ? fmt(latestVal) : "—"} <span className="small">{unit}</span></div>
+            <div className="s">Best: {bestVal != null ? `${fmt(bestVal)} ${unit}` : "—"}</div>
             <div className="s">Planned W{nextWeek}: {plannedByExercise?.[ex] ?? "—"}</div>
           </div>
         );
@@ -162,7 +171,7 @@ export function Charts({ weekly, dailyOverview, unit, tracked, activeProgram }) 
         const weeklyMap = new Map();
         (weekly || []).forEach((w) => {
           const val = Number(w?.metrics_by_exercise?.[ex]?.e1rm);
-          if (Number.isFinite(val)) weeklyMap.set(w.week_number, val);
+          if (Number.isFinite(val)) weeklyMap.set(w.week_number, toDisplayUnit(val, unit));
         });
 
         const dailyMap = new Map();
@@ -173,44 +182,34 @@ export function Charts({ weekly, dailyOverview, unit, tracked, activeProgram }) 
             if (normalizeExerciseName(e?.exercise) !== norm) return;
             const val = e1rmFromTopReps(e?.actual?.top ?? e?.top, e?.actual?.reps ?? e?.reps);
             if (!Number.isFinite(val)) return;
+            const displayVal = toDisplayUnit(val, unit);
             const cur = dailyMap.get(isoDate);
-            if (!cur || val > cur.val) dailyMap.set(isoDate, { val, date: isoDate });
+            if (!cur || displayVal > cur.val) dailyMap.set(isoDate, { val: displayVal, date: isoDate });
           });
         });
 
         const allWeekNums = Array.from(new Set((weekly || []).map((w) => w.week_number))).sort((a, b) => a - b);
-const dailyPoints = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+        const dailyPoints = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-// Convert weekly week numbers to dates for sorting
-const weeklyWithDates = allWeekNums.map((w) => ({
-  label: weekNumToDate(w),
-  val: weeklyMap.get(w) ?? null,
-  sortKey: weekNumToDate(w), // will be dd/mm/yyyy or W1 fallback
-  isWeek: true,
-  weekNum: w,
-}));
+        const weeklyWithDates = allWeekNums.map((w) => ({
+          label: weekNumToDate(w), val: weeklyMap.get(w) ?? null,
+          sortKey: weekNumToDate(w), isWeek: true, weekNum: w,
+        }));
+        const dailyWithDates = dailyPoints.map((p) => ({
+          label: formatDate(p.date), val: p.val, sortKey: p.date, isWeek: false,
+        }));
+        const combined = [...weeklyWithDates, ...dailyWithDates].sort((a, b) => {
+          const toSortable = (x) => {
+            if (!x.isWeek) return x.sortKey;
+            const parts = x.sortKey.split("/");
+            if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            return `W${String(x.weekNum).padStart(4, "0")}`;
+          };
+          return toSortable(a).localeCompare(toSortable(b));
+        });
 
-const dailyWithDates = dailyPoints.map((p) => ({
-  label: formatDate(p.date),
-  val: p.val,
-  sortKey: p.date, // iso date string, sortable
-  isWeek: false,
-}));
-
-// Sort combined: convert dd/mm/yyyy back to sortable for weekly, use iso for daily
-const combined = [...weeklyWithDates, ...dailyWithDates].sort((a, b) => {
-  const toSortable = (x) => {
-    if (!x.isWeek) return x.sortKey; // iso date already sortable
-    // convert dd/mm/yyyy to yyyy-mm-dd for sorting
-    const parts = x.sortKey.split("/");
-    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    return `W${String(x.weekNum).padStart(4, "0")}`; // fallback for W1 etc
-  };
-  return toSortable(a).localeCompare(toSortable(b));
-});
-
-const labels = combined.map((x) => x.label);
-const series = combined.map((x) => x.val);
+        const labels = combined.map((x) => x.label);
+        const series = combined.map((x) => x.val);
 
         return (
           <div key={ex} className="card">

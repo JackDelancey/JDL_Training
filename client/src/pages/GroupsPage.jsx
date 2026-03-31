@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import { apiFetch } from "../utils/api";
 import { isoLocalToday, isoLocalNDaysAgo, formatPrettyDate, timeAgo } from "../utils/dates";
-import { fmt } from "../utils/calcs";
+import { fmt, toDisplayUnit } from "../utils/calcs";
 import { Line } from "react-chartjs-2";
 import { Chart as ChartJS, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend } from "chart.js";
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -11,7 +11,7 @@ function eventSummaryText(event, unit) {
   const type = event?.event_type || "";
   const payload = event?.payload || {};
   const who = event?.user?.name || event?.name || "Someone";
-  if (type === "pr_e1rm") return `🔥 ${who} hit a new ${payload.exercise || "lift"} PR — ${payload.top != null ? `${fmt(payload.top)} ${unit}` : "new best"}`;
+  if (type === "pr_e1rm") return `🔥 ${who} hit a new ${payload.exercise || "lift"} PR — ${payload.top != null ? `${fmt(toDisplayUnit(payload.top, unit))} ${unit}` : "new best"}`;
   if (type === "session_completed") return `✅ ${who} completed a session${payload.date ? ` on ${payload.date}` : ""}`;
   if (type === "member_joined") return `👋 ${who} joined the group`;
   if (type === "program_published") return `📘 ${who} published${payload.title ? ` — ${payload.title}` : " a program"}`;
@@ -53,6 +53,15 @@ function FeedTab({ events, unit }) {
 function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExercise, setLbExercise, lbWindow, setLbWindow }) {
   const rows = Array.isArray(leaderboard?.rows) ? leaderboard.rows : [];
   const showBw = lbType === "strength" || lbType === "relative_strength";
+
+  // For strength/improvement types, scores are in kg — convert for display
+  const needsUnitConversion = lbType === "strength" || lbType === "improvement" || lbType === "volume";
+
+  function displayScore(score) {
+    if (!Number.isFinite(Number(score))) return "—";
+    return needsUnitConversion ? fmt(toDisplayUnit(Number(score), unit)) : fmt(Number(score));
+  }
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
@@ -88,11 +97,11 @@ function LeaderboardTab({ unit, leaderboard, library, lbType, setLbType, lbExerc
                   {r.rank ?? idx + 1}
                 </td>
                 <td style={{ fontWeight: 600 }}>{r.name || r.email || "—"}</td>
-                <td>{Number.isFinite(Number(r.score)) ? fmt(r.score) : "—"}</td>
-<td>{r.meta?.top != null ? `${fmt(r.meta.top)} × ${r.meta?.reps ?? "?"}` : "—"}</td>
-{showBw && <td>{r.meta?.bodyweight != null ? fmt(r.meta.bodyweight) : "—"}</td>}
-{lbType === "strength" && <td>{r.meta?.wilks != null ? fmt(r.meta.wilks) : "—"}</td>}
-<td className="small">{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.week ? `W${r.meta.week}` : "—"}</td>
+                <td>{displayScore(r.score)}</td>
+                <td>{r.meta?.top != null ? `${fmt(toDisplayUnit(r.meta.top, unit))} × ${r.meta?.reps ?? "?"}` : "—"}</td>
+                {showBw && <td>{r.meta?.bodyweight != null ? fmt(toDisplayUnit(r.meta.bodyweight, unit)) : "—"}</td>}
+                {lbType === "strength" && <td>{r.meta?.wilks != null ? fmt(r.meta.wilks) : "—"}</td>}
+                <td className="small">{r.meta?.date ? formatPrettyDate(r.meta.date) : r.meta?.week ? `W${r.meta.week}` : "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -116,7 +125,7 @@ function MembersTab({ members, unit }) {
           {m.metrics && Object.keys(m.metrics).length > 0 && (
             <div style={{ marginTop: 6, display: "flex", gap: 8, flexWrap: "wrap" }}>
               {Object.entries(m.metrics).slice(0, 3).map(([k, v]) => (
-                <span key={k} className="small">{k}: <b>{v != null ? `${fmt(v)}${unit}` : "—"}</b></span>
+                <span key={k} className="small">{k}: <b>{v != null ? `${fmt(toDisplayUnit(v, unit))}${unit}` : "—"}</b></span>
               ))}
             </div>
           )}
@@ -189,8 +198,8 @@ function ChallengesTab({ token, groupId, challenges, onInvalidToken, onError }) 
 
 function CompareTab({ unit, members, library, compareA, setCompareA, compareB, setCompareB, compareExercise, setCompareExercise, compareData, onRefresh }) {
   const labels = (compareData?.user_a?.history || []).map((x) => x.label || "—");
-  const serA = (compareData?.user_a?.history || []).map((x) => Number.isFinite(Number(x.e1rm)) ? Number(x.e1rm) : null);
-  const serB = (compareData?.user_b?.history || []).map((x) => Number.isFinite(Number(x.e1rm)) ? Number(x.e1rm) : null);
+  const serA = (compareData?.user_a?.history || []).map((x) => Number.isFinite(Number(x.e1rm)) ? toDisplayUnit(Number(x.e1rm), unit) : null);
+  const serB = (compareData?.user_b?.history || []).map((x) => Number.isFinite(Number(x.e1rm)) ? toDisplayUnit(Number(x.e1rm), unit) : null);
 
   return (
     <div>
@@ -216,7 +225,7 @@ function CompareTab({ unit, members, library, compareA, setCompareA, compareB, s
             {["user_a","user_b"].map((key, i) => (
               <div key={key} className="metric">
                 <div className="k">{compareData?.[key]?.name || `Athlete ${i === 0 ? "A" : "B"}`}</div>
-                <div className="v">{compareData?.[key]?.best_e1rm != null ? `${fmt(compareData[key].best_e1rm)} ${unit}` : "—"}</div>
+                <div className="v">{compareData?.[key]?.best_e1rm != null ? `${fmt(toDisplayUnit(compareData[key].best_e1rm, unit))} ${unit}` : "—"}</div>
                 <div className="s">Best {compareExercise} e1RM</div>
               </div>
             ))}
@@ -316,10 +325,7 @@ export default function GroupsPage() {
     } catch (e) { setErr(e.message); setCompareData(null); }
   }
 
-  useEffect(() => {
-    loadGroups();
-    apiFetch("/api/programs", { token, onInvalidToken }).then((r) => { const list = r?.programs || []; setMyPrograms(list); if (!shareProgramId && list[0]?.id) setShareProgramId(list[0].id); }).catch(() => {});
-  }, [token]);
+  useEffect(() => { loadGroups(); apiFetch("/api/programs", { token, onInvalidToken }).then((r) => { const list = r?.programs || []; setMyPrograms(list); if (!shareProgramId && list[0]?.id) setShareProgramId(list[0].id); }).catch(() => {}); }, [token]);
   useEffect(() => { loadWorkspace(selectedId); }, [token, selectedId]);
   useEffect(() => { if (selectedId) loadLeaderboard(selectedId); }, [token, selectedId, lbType, lbExercise, lbWindow]);
   useEffect(() => { if (activeTab === "compare" && selectedId) loadCompare(selectedId); }, [token, selectedId, activeTab, compareA, compareB, compareExercise]);
@@ -386,8 +392,6 @@ export default function GroupsPage() {
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 16, alignItems: "start" }}>
-
-      {/* ── Left: group list ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div className="card" style={{ padding: "14px 16px" }}>
           <div style={{ fontWeight: 700, marginBottom: 10 }}>Groups</div>
@@ -396,7 +400,6 @@ export default function GroupsPage() {
             <button className="secondary" style={{ flex: 1, fontSize: 12, padding: "6px 10px" }} onClick={joinGroup} disabled={busy}>Join</button>
           </div>
         </div>
-
         {groups.length === 0 ? (
           <div className="card" style={{ textAlign: "center", padding: "24px 16px", background: "var(--surface2)" }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>🏋️</div>
@@ -411,7 +414,6 @@ export default function GroupsPage() {
         ))}
       </div>
 
-      {/* ── Right: workspace ── */}
       {!selectedId ? (
         <div className="card" style={{ textAlign: "center", padding: "48px 20px", background: "var(--surface2)" }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>👈</div>
@@ -420,7 +422,6 @@ export default function GroupsPage() {
         </div>
       ) : (
         <div className="card">
-          {/* Header */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
             <div>
               <h2 style={{ margin: "0 0 2px" }}>{groupDetail?.name || selected?.name}</h2>
@@ -435,7 +436,6 @@ export default function GroupsPage() {
             </div>
           </div>
 
-          {/* Share program */}
           {myPrograms.length > 0 && (
             <div style={{ display: "flex", gap: 8, marginBottom: 14, alignItems: "center" }}>
               <select value={shareProgramId} onChange={(e) => setShareProgramId(e.target.value)} style={{ flex: 1, fontSize: 12 }}>
@@ -446,7 +446,6 @@ export default function GroupsPage() {
             </div>
           )}
 
-          {/* Tabs */}
           <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 16, borderBottom: "1px solid var(--border)", paddingBottom: 12 }}>
             {TABS.map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)}
@@ -456,7 +455,6 @@ export default function GroupsPage() {
             ))}
           </div>
 
-          {/* Tab content */}
           {activeTab === "feed" && <FeedTab events={feed} unit={unit} />}
           {activeTab === "leaderboard" && <LeaderboardTab unit={unit} leaderboard={leaderboard} library={library} lbType={lbType} setLbType={setLbType} lbExercise={lbExercise} setLbExercise={setLbExercise} lbWindow={lbWindow} setLbWindow={setLbWindow} />}
           {activeTab === "members" && <MembersTab members={members} unit={unit} />}

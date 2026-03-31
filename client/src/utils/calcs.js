@@ -52,3 +52,18 @@ export function buildEntriesFromPlanRows(rows) {
     }))
     .filter((x) => x.exercise);
 }
+
+export const KG_TO_LB = 2.20462;
+export const LB_TO_KG = 1 / 2.20462;
+
+export function toDisplayUnit(kgValue, unit) {
+  const n = Number(kgValue);
+  if (!Number.isFinite(n)) return null;
+  return unit === "lb" ? Math.round(n * KG_TO_LB * 10) / 10 : n;
+}
+
+export function toStorageKg(displayValue, unit) {
+  const n = Number(displayValue);
+  if (!Number.isFinite(n)) return null;
+  return unit === "lb" ? Math.round((n * LB_TO_KG) * 10) / 10 : n;
+}

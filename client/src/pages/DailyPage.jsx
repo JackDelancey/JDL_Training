@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import { apiFetch } from "../utils/api";
 import { isoLocalToday, normalizeDateOnly, formatPrettyDate } from "../utils/dates";
-import { fmt, e1rmFromTopReps, buildEntriesFromPlanRows, dailyDraftKey } from "../utils/calcs";
+import { fmt, e1rmFromTopReps, buildEntriesFromPlanRows, dailyDraftKey, toDisplayUnit, toStorageKg } from "../utils/calcs";
 import { Notice } from "../components/Auth";
 
 export default function DailyPage() {
@@ -72,7 +72,7 @@ export default function DailyPage() {
         if (ents.length) {
           await apiFetch(`/api/daily/${nextDate}`, {
             token, method: "PUT",
-            body: { unit, bodyweight: dayObj?.bodyweight ?? null, sleep_hours: dayObj?.sleep_hours ?? null, pec_pain_0_10: dayObj?.pec_pain_0_10 ?? null, zone2_mins: dayObj?.zone2_mins ?? null, notes: dayObj?.notes ?? null, entries: ents },
+            body: { unit: "kg", bodyweight: dayObj?.bodyweight ?? null, sleep_hours: dayObj?.sleep_hours ?? null, pec_pain_0_10: dayObj?.pec_pain_0_10 ?? null, zone2_mins: dayObj?.zone2_mins ?? null, notes: dayObj?.notes ?? null, entries: ents },
             onInvalidToken,
           });
           const d2 = await apiFetch(`/api/daily/${nextDate}`, { token, onInvalidToken }).catch(() => ({ day: null }));
@@ -125,7 +125,21 @@ export default function DailyPage() {
   async function saveDay(nextDay) {
     try {
       setBusy(true);
-      await apiFetch(`/api/daily/${date}`, { token, method: "PUT", body: nextDay, onInvalidToken });
+      // Convert any lb inputs back to kg before saving
+      const entriesToSave = (nextDay.entries || []).map((e) => ({
+        ...e,
+        actual: {
+          ...e.actual,
+          top: e?.actual?.top !== "" && e?.actual?.top != null
+            ? toStorageKg(e.actual.top, unit)
+            : e?.actual?.top,
+        },
+      }));
+      await apiFetch(`/api/daily/${date}`, {
+        token, method: "PUT",
+        body: { ...nextDay, unit: "kg", entries: entriesToSave },
+        onInvalidToken,
+      });
       localStorage.removeItem(dailyDraftKey(date));
       setDailyDraftNotice(false);
       await loadAll(date);
@@ -142,7 +156,7 @@ export default function DailyPage() {
       const mergedEntries = [...(day?.entries || []), ...newEntries];
       await apiFetch(`/api/daily/${date}`, {
         token, method: "PUT",
-        body: { unit, bodyweight: day?.bodyweight ?? null, sleep_hours: day?.sleep_hours ?? null, pec_pain_0_10: day?.pec_pain_0_10 ?? null, zone2_mins: day?.zone2_mins ?? null, notes: day?.notes ?? null, entries: mergedEntries, is_completed: day?.is_completed === true, completed_at: day?.completed_at ?? null },
+        body: { unit: "kg", bodyweight: day?.bodyweight ?? null, sleep_hours: day?.sleep_hours ?? null, pec_pain_0_10: day?.pec_pain_0_10 ?? null, zone2_mins: day?.zone2_mins ?? null, notes: day?.notes ?? null, entries: mergedEntries, is_completed: day?.is_completed === true, completed_at: day?.completed_at ?? null },
         onInvalidToken,
       });
       await loadAll(date);
@@ -153,31 +167,38 @@ export default function DailyPage() {
     const name = String(manualExercise || manualPick || "").trim();
     if (!name) return;
     const newEntry = { exercise: name, source: "manual", planned: { sets_reps: "", load_rpe: "", notes: "", target: "" }, completed: false, notes: "", actual: { top: "", reps: 3, rpe: "" } };
-    setDay((prev) => ({ ...(prev || { entry_date: date, unit }), entries: [...(prev?.entries || []), newEntry] }));
+    setDay((prev) => ({ ...(prev || { entry_date: date, unit: "kg" }), entries: [...(prev?.entries || []), newEntry] }));
     setManualExercise(""); setManualPick(""); setShowManual(false);
   }
 
   function removeEntry(idx) {
     const ents = [...(day?.entries || [])];
     ents.splice(idx, 1);
-    setDay((prev) => ({ ...(prev || { entry_date: date, unit }), entries: ents }));
+    setDay((prev) => ({ ...(prev || { entry_date: date, unit: "kg" }), entries: ents }));
   }
 
   function setEntry(idx, patch) {
     const ents = [...(day?.entries || [])];
     ents[idx] = { ...ents[idx], ...patch };
-    setDay((prev) => ({ ...(prev || { entry_date: date, unit }), entries: ents }));
+    setDay((prev) => ({ ...(prev || { entry_date: date, unit: "kg" }), entries: ents }));
   }
 
   function setActual(idx, patch) {
     const ents = [...(day?.entries || [])];
     const cur = ents[idx] || {};
     ents[idx] = { ...cur, actual: { ...(cur.actual || {}), ...patch } };
-    setDay((prev) => ({ ...(prev || { entry_date: date, unit }), entries: ents }));
+    setDay((prev) => ({ ...(prev || { entry_date: date, unit: "kg" }), entries: ents }));
+  }
+
+  // Display value for a stored kg top set
+  function displayTop(storedTop) {
+    const n = Number(storedTop);
+    if (!Number.isFinite(n) || storedTop === "") return storedTop;
+    return toDisplayUnit(n, unit);
   }
 
   const dayPayload = () => ({
-    unit: day?.unit || unit,
+    unit: "kg",
     bodyweight: day?.bodyweight ?? null,
     sleep_hours: day?.sleep_hours ?? null,
     pec_pain_0_10: day?.pec_pain_0_10 ?? null,
@@ -197,7 +218,6 @@ export default function DailyPage() {
       {/* ── Left: Date + Plan ── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div className="card">
-          {/* Date picker */}
           <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 14 }}>
             <div className="field" style={{ flex: 1 }}>
               <label>Date</label>
@@ -214,7 +234,6 @@ export default function DailyPage() {
             )}
           </div>
 
-          {/* Plan */}
           {!displayPlan ? (
             <div className="small">Loading…</div>
           ) : isTraining ? (
@@ -257,7 +276,6 @@ export default function DailyPage() {
 
       {/* ── Right: Log ── */}
       <div className="card">
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
           <div>
             <h2 style={{ margin: 0 }}>Log</h2>
@@ -272,11 +290,8 @@ export default function DailyPage() {
               {showManual ? "Cancel" : "+ Add exercise"}
             </button>
             {day && (
-              <button
-                style={{ fontSize: 12, padding: "6px 12px" }}
-                disabled={busy}
-                onClick={() => saveDay({ ...dayPayload(), is_completed: !day?.is_completed, completed_at: !day?.is_completed ? new Date().toISOString() : null })}
-              >
+              <button style={{ fontSize: 12, padding: "6px 12px" }} disabled={busy}
+                onClick={() => saveDay({ ...dayPayload(), is_completed: !day?.is_completed, completed_at: !day?.is_completed ? new Date().toISOString() : null })}>
                 {day?.is_completed ? "✓ Done" : "Mark done"}
               </button>
             )}
@@ -291,19 +306,23 @@ export default function DailyPage() {
           />
         )}
 
-        {/* Bodyweight + sleep */}
         <div className="grid grid-2" style={{ marginBottom: 14 }}>
           <div className="field">
             <label>Bodyweight ({unit})</label>
-            <input value={day?.bodyweight ?? ""} placeholder="e.g. 85" onChange={(ev) => setDay((prev) => ({ ...(prev || { entry_date: date, unit }), bodyweight: ev.target.value || null }))} />
+            <input value={day?.bodyweight != null ? toDisplayUnit(day.bodyweight, unit) : ""} placeholder="e.g. 85"
+              onChange={(ev) => {
+                const raw = ev.target.value;
+                const stored = raw === "" ? null : toStorageKg(raw, unit);
+                setDay((prev) => ({ ...(prev || { entry_date: date, unit: "kg" }), bodyweight: stored }));
+              }} />
           </div>
           <div className="field">
             <label>Sleep (h)</label>
-            <input value={day?.sleep_hours ?? ""} placeholder="e.g. 8" onChange={(ev) => setDay((prev) => ({ ...(prev || { entry_date: date, unit }), sleep_hours: ev.target.value || null }))} />
+            <input value={day?.sleep_hours ?? ""} placeholder="e.g. 8"
+              onChange={(ev) => setDay((prev) => ({ ...(prev || { entry_date: date, unit: "kg" }), sleep_hours: ev.target.value || null }))} />
           </div>
         </div>
 
-        {/* Add exercise inline */}
         {showManual && (
           <div style={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 10, padding: 12, marginBottom: 14 }}>
             <div className="grid grid-2" style={{ gap: 8, marginBottom: 8 }}>
@@ -324,37 +343,34 @@ export default function DailyPage() {
           </div>
         )}
 
-        {/* Entries */}
         {!day ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
             <div className="small">No log for this date yet.</div>
-            {isTraining && (
-              <button style={{ marginTop: 12, fontSize: 13 }} onClick={copySelectedSession} disabled={busy}>Load today's session</button>
-            )}
+            {isTraining && <button style={{ marginTop: 12, fontSize: 13 }} onClick={copySelectedSession} disabled={busy}>Load today's session</button>}
           </div>
         ) : entries.length === 0 ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
             <div className="small">No exercises yet.</div>
-            {isTraining && (
-              <button style={{ marginTop: 12, fontSize: 13 }} onClick={copySelectedSession} disabled={busy}>Load planned session</button>
-            )}
+            {isTraining && <button style={{ marginTop: 12, fontSize: 13 }} onClick={copySelectedSession} disabled={busy}>Load planned session</button>}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {entries.map((e, idx) => {
               const hx = exerciseHistory?.[e.exercise] || {};
               const last = Array.isArray(hx.last_entries) ? hx.last_entries[0] : null;
-              const e1rm = e?.actual?.top && e?.actual?.reps
+              // e1rm calculated from stored kg, then converted for display
+              const e1rmKg = e?.actual?.top && e?.actual?.reps
                 ? e1rmFromTopReps(e.actual.top, e.actual.reps) : null;
+              const e1rmDisplay = e1rmKg != null ? toDisplayUnit(e1rmKg, unit) : null;
+              // Display top set converted from stored kg
+              const topDisplay = displayTop(e?.actual?.top);
 
               return (
                 <div key={idx} style={{
                   background: e.completed ? "rgba(16,185,129,0.06)" : "var(--surface2)",
                   border: `1px solid ${e.completed ? "rgba(16,185,129,0.2)" : "var(--border)"}`,
-                  borderRadius: 10, padding: "10px 12px",
-                  transition: "all 0.15s ease",
+                  borderRadius: 10, padding: "10px 12px", transition: "all 0.15s ease",
                 }}>
-                  {/* Exercise header */}
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 700, fontSize: 13, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -367,19 +383,27 @@ export default function DailyPage() {
                       </div>
                       {last && (
                         <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 2 }}>
-                          Last: <b>{fmt(last.top)} × {last.reps}</b>{hx.best_all_time_e1rm != null ? ` · Best: ${fmt(hx.best_all_time_e1rm)} ${unit}` : ""}
+                          Last: <b>{fmt(toDisplayUnit(last.top, unit))} × {last.reps}</b>
+                          {hx.best_all_time_e1rm != null ? ` · Best: ${fmt(toDisplayUnit(hx.best_all_time_e1rm, unit))} ${unit}` : ""}
                         </div>
                       )}
                     </div>
                     <button className="secondary" style={{ fontSize: 10, padding: "2px 7px", flexShrink: 0 }} onClick={() => removeEntry(idx)}>✕</button>
                   </div>
 
-                  {/* Inputs + footer in one row */}
                   <div style={{ display: "flex", gap: 6, alignItems: "flex-end", flexWrap: "wrap" }}>
                     <div style={{ display: "grid", gridTemplateColumns: showRpe ? "80px 60px 60px" : "80px 60px", gap: 6 }}>
                       <div className="field">
                         <label style={{ fontSize: 10 }}>Top ({unit})</label>
-                        <input style={{ fontSize: 13, padding: "5px 8px" }} value={e?.actual?.top ?? ""} onChange={(ev) => setActual(idx, { top: ev.target.value })} placeholder="—" />
+                        <input style={{ fontSize: 13, padding: "5px 8px" }}
+                          value={topDisplay ?? ""}
+                          onChange={(ev) => {
+                            // Store in kg always
+                            const raw = ev.target.value;
+                            const stored = raw === "" ? "" : toStorageKg(raw, unit);
+                            setActual(idx, { top: stored });
+                          }}
+                          placeholder="—" />
                       </div>
                       <div className="field">
                         <label style={{ fontSize: 10 }}>Reps</label>
@@ -397,7 +421,7 @@ export default function DailyPage() {
                       <input type="checkbox" checked={!!e.completed} onChange={(ev) => setEntry(idx, { completed: ev.target.checked })} />
                       <span style={{ fontSize: 11, color: "var(--text2)" }}>Done</span>
                     </label>
-                    {e1rm && <div style={{ fontSize: 11, color: "rgba(232,25,44,0.85)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(e1rm)}</div>}
+                    {e1rmDisplay && <div style={{ fontSize: 11, color: "rgba(232,25,44,0.85)", fontWeight: 700, whiteSpace: "nowrap" }}>{fmt(e1rmDisplay)}</div>}
                   </div>
                 </div>
               );
@@ -405,7 +429,6 @@ export default function DailyPage() {
           </div>
         )}
 
-        {/* Save bar */}
         {day && (
           <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             <button className="secondary" disabled={busy} onClick={() => saveDay(dayPayload())}>{busy ? "…" : "Save"}</button>
