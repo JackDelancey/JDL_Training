@@ -516,6 +516,7 @@ module.exports = {
   clampInt,
   makeJoinCode,
   normalizeRelationshipType,
+  resolveExerciseAlias,
   // load / e1rm
   parseLoadNumber,
   parseTrainingLoad,
