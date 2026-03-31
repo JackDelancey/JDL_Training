@@ -12,6 +12,7 @@ const {
   bucketForReps,
   parseSetsRepsTargetReps,
   formatDateWithWeeksAgo,
+  resolveExerciseAlias,
 } = require("../utils");
 
 // ─── Explorer ─────────────────────────────────────────────────────────
@@ -21,7 +22,7 @@ router.get("/exercises/explorer", requireAuth, async (req, res) => {
     const exercise = String(req.query?.exercise || "").trim();
     if (!exercise) return res.status(400).json({ error: "exercise is required" });
 
-    const target = normalizeExerciseName(exercise);
+    const target = normalizeExerciseName(resolveExerciseAlias(exercise));
 
     const [dailyQ, weeklyQ, programQ] = await Promise.all([
       pool.query(
@@ -41,8 +42,8 @@ router.get("/exercises/explorer", requireAuth, async (req, res) => {
     const hits = [];
 
     function matchName(rawName) {
-      return normalizeExerciseName(rawName) === target;
-    }
+  return normalizeExerciseName(resolveExerciseAlias(rawName)) === target;
+}
 
     // Daily hits
     for (const row of dailyQ.rows || []) {

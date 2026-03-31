@@ -161,6 +161,26 @@ function trainingSessionIndex(startISO, targetISO, trainingDays) {
   return count - 1;
 }
 
+const EXERCISE_ALIASES = {
+  "orm bench": "Bench",
+  "bench press": "Bench",
+  "flat bench": "Bench",
+  "squat": "Squat",
+  "back squat": "Squat",
+  "high bar squat": "Squat",
+  "conventional deadlift": "Deadlift",
+  "conv deadlift": "Deadlift",
+  "ohp": "Overhead Press",
+  "overhead press": "Overhead Press",
+  "press": "Overhead Press",
+};
+
+function resolveExerciseAlias(name) {
+  if (!name) return name;
+  const norm = String(name).trim().toLowerCase();
+  return EXERCISE_ALIASES[norm] || name;
+}
+
 // ─── Date helpers (Local) ─────────────────────────────────────────────
 
 function parseISODateLocal(s) {

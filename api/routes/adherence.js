@@ -62,12 +62,15 @@ router.get("/adherence/program", requireAuth, async (req, res) => {
     const trainingSet = new Set(trainingDays);
 
     const dQ = await pool.query(
-      `select entry_date, entries
-       from public.daily_entries_app
-       where user_id = $1 and entry_date between $2::date and $3::date`,
+      `select entry_date, entries, is_completed
+ from public.daily_entries_app
+ where user_id = $1 and entry_date between $2::date and $3::date`,
       [req.user.id, from, to]
     );
-    const dailyByDate = new Map(dQ.rows.map((r) => [String(r.entry_date), r]));
+    const dailyByDate = new Map(dQ.rows.map((r) => [
+  String(r.entry_date).slice(0, 10),
+  { ...r, entries: Array.isArray(r.entries) ? r.entries : (typeof r.entries === "string" ? JSON.parse(r.entries) : []) }
+]));
     const dates = eachDateUTC(from, to);
 
     let planned = 0, completed = 0;
@@ -81,7 +84,8 @@ router.get("/adherence/program", requireAuth, async (req, res) => {
 
       const week_number = Math.floor(idx / daysPerWeek) + 1;
       planned++;
-      const isCompleted = isDayCompleted(dailyByDate.get(iso));
+      const dayRow = dailyByDate.get(iso);
+const isCompleted = dayRow?.is_completed === true || isDayCompleted(dayRow);
       if (isCompleted) completed++;
 
       if (!byWeekMap.has(week_number)) byWeekMap.set(week_number, { week_number, planned: 0, completed: 0 });

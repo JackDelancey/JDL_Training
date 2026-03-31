@@ -24,8 +24,8 @@ const {
   isNonEmpty,
   safeJsonArray,
   daysBetweenLocal,
+  resolveExerciseAlias
 } = require("../utils");
-
 // ─── Shared helpers ───────────────────────────────────────────────────
 
 async function getGroupBasic(groupId) {
@@ -311,7 +311,7 @@ router.get("/groups/:id/leaderboard", requireAuth, async (req, res) => {
     const type = String(req.query?.type || "strength").toLowerCase();
     const exercise = String(req.query?.exercise || "Bench").trim();
     const window = String(req.query?.window || "all").toLowerCase();
-    const exNorm = normalizeExerciseName(exercise);
+    const exNorm = normalizeExerciseName(resolveExerciseAlias(exercise));
 
     const membersQ = await pool.query(
       `select au.id as user_id, au.email, au.name
@@ -359,7 +359,7 @@ for (const row of dailyRows) {
     const bwData = latestBwByUser.get(String(m.user_id));
     const bwClean = bwData?.bw ?? null;
     for (const mt of buildMetricRowsFromEntries(row.entries)) {
-      if (normalizeExerciseName(mt.exercise) !== exNorm) continue;
+      if (normalizeExerciseName(resolveExerciseAlias(mt.exercise)) !== exNorm) continue;
       if (!Number.isFinite(mt.e1rm)) continue;
       if (!best || mt.e1rm > best.score) {
         best = {
@@ -434,9 +434,18 @@ for (const row of dailyRows) {
       return { user_id: m.user_id, name: m.name || m.email, email: m.email, score: result?.score ?? null, meta: result?.meta ?? {} };
     });
 
-    const ranked = rankRows(
-      rows.filter((r) => Number.isFinite(Number(r.score))).sort((a, b) => Number(b.score) - Number(a.score))
-    );
+    const useWilks = type === "strength" && rows.some((r) => r.meta?.wilks != null);
+const ranked = rankRows(
+  rows.filter((r) => Number.isFinite(Number(r.score)))
+    .sort((a, b) => {
+      if (useWilks) {
+        const wa = Number(a.meta?.wilks ?? 0);
+        const wb = Number(b.meta?.wilks ?? 0);
+        if (wb !== wa) return wb - wa;
+      }
+      return Number(b.score) - Number(a.score);
+    })
+);
     res.json({ type, exercise, window, rows: ranked });
   } catch (e) {
     res.status(500).json({ error: String(e.message || e) });

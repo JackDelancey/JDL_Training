@@ -179,10 +179,38 @@ export function Charts({ weekly, dailyOverview, unit, tracked, activeProgram }) 
         });
 
         const allWeekNums = Array.from(new Set((weekly || []).map((w) => w.week_number))).sort((a, b) => a - b);
-        const dailyPoints = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+const dailyPoints = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
-        const labels = [...allWeekNums.map((w) => weekNumToDate(w)), ...dailyPoints.map((p) => formatDate(p.date))];
-        const series = [...allWeekNums.map((w) => weeklyMap.get(w) ?? null), ...dailyPoints.map((p) => p.val)];
+// Convert weekly week numbers to dates for sorting
+const weeklyWithDates = allWeekNums.map((w) => ({
+  label: weekNumToDate(w),
+  val: weeklyMap.get(w) ?? null,
+  sortKey: weekNumToDate(w), // will be dd/mm/yyyy or W1 fallback
+  isWeek: true,
+  weekNum: w,
+}));
+
+const dailyWithDates = dailyPoints.map((p) => ({
+  label: formatDate(p.date),
+  val: p.val,
+  sortKey: p.date, // iso date string, sortable
+  isWeek: false,
+}));
+
+// Sort combined: convert dd/mm/yyyy back to sortable for weekly, use iso for daily
+const combined = [...weeklyWithDates, ...dailyWithDates].sort((a, b) => {
+  const toSortable = (x) => {
+    if (!x.isWeek) return x.sortKey; // iso date already sortable
+    // convert dd/mm/yyyy to yyyy-mm-dd for sorting
+    const parts = x.sortKey.split("/");
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    return `W${String(x.weekNum).padStart(4, "0")}`; // fallback for W1 etc
+  };
+  return toSortable(a).localeCompare(toSortable(b));
+});
+
+const labels = combined.map((x) => x.label);
+const series = combined.map((x) => x.val);
 
         return (
           <div key={ex} className="card">
