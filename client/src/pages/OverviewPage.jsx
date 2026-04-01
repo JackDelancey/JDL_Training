@@ -105,7 +105,7 @@ function ProgramCard({ token, onInvalidToken }) {
 
 function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onError }) {
   const [open, setOpen] = useState(false);
-  const [week, setWeek] = useState(1);
+  const [logDate, setLogDate] = useState(isoLocalToday());
   const [meta, setMeta] = useState({ bodyweight: "", sleep_hours: "", pec_pain_0_10: "", zone2_mins: "", notes: "" });
   const [entries, setEntries] = useState(() => (tracked || []).map((exercise) => ({ exercise, top: "", reps: 3, rpe: "" })));
 
@@ -128,11 +128,11 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
         top: e.top !== "" && e.top != null ? toStorageKg(e.top, unit) : e.top,
       }));
       const bwKg = meta.bodyweight !== "" ? toStorageKg(meta.bodyweight, unit) : "";
-      await apiFetch(`/api/weekly/${week}`, {
-        token, method: "PUT",
-        body: { unit: "kg", ...meta, bodyweight: bwKg, entries: entriesToSave },
-        onInvalidToken,
-      });
+      await apiFetch(`/api/weekly/by-date/${logDate}`, {
+  token, method: "PUT",
+  body: { unit: "kg", ...meta, bodyweight: bwKg, entries: entriesToSave },
+  onInvalidToken,
+});
       onSaved();
       setOpen(false);
     } catch (e) { onError(e.message); }
@@ -140,7 +140,7 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
 
   async function autofill() {
     try {
-      const res = await apiFetch(`/api/weekly/from-daily/${week}`, { token, method: "POST", body: { unit: "kg" }, onInvalidToken });
+      const res = await apiFetch(`/api/weekly/from-daily/by-date/${logDate}`, { token, method: "POST", body: { unit: "kg" }, onInvalidToken });
       if (Array.isArray(res.derived_entries)) {
         // Convert returned kg values to display unit
         setEntries(res.derived_entries.map((e) => ({
@@ -168,7 +168,7 @@ function WeeklyLogSection({ token, unit, tracked, onSaved, onInvalidToken, onErr
       {open && (
         <div style={{ marginTop: 16 }}>
           <div style={{ display: "grid", gridTemplateColumns: "80px 1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
-            <div className="field"><label>Week</label><input value={week} onChange={(e) => setWeek(e.target.value)} /></div>
+            <div className="field"><label>Date</label><input type="date" value={logDate} onChange={(e) => setLogDate(e.target.value)} /></div>
             <div className="field">
               <label>Bodyweight ({unit})</label>
               <input value={meta.bodyweight} onChange={(e) => setMeta({ ...meta, bodyweight: e.target.value })} />

@@ -189,5 +189,176 @@ router.post("/weekly/from-daily/:week", requireAuth, async (req, res) => {
     res.status(500).json({ error: String(e.message || e) });
   }
 });
+// ─── Helper: resolve week number from a date ─────────────────────────
+
+async function resolveWeekFromDate(userId, dateISO, pool, toISODateUTC, trainingDatesForProgramWeek) {
+  const u = await pool.query(
+    `select active_program_id from public.app_users where id = $1`,
+    [userId]
+  );
+  const activeId = u.rows?.[0]?.active_program_id;
+  if (!activeId) return null;
+
+  const p = await pool.query(
+    `select start_date, training_days, days_per_week, total_weeks
+     from public.programs_app where id = $1 and user_id = $2`,
+    [activeId, userId]
+  );
+  if (!p.rowCount) return null;
+
+  const prog = p.rows[0];
+  const startISO = prog.start_date ? toISODateUTC(new Date(prog.start_date)) : null;
+  if (!startISO) return null;
+
+  const trainingDays = Array.isArray(prog.training_days) ? prog.training_days : [];
+  const daysPerWeek = Math.max(1, Number(prog.days_per_week || 4));
+  const totalWeeks = Number(prog.total_weeks || 0);
+  const tset = new Set(trainingDays.map(Number));
+
+  const targetD = new Date(dateISO + "T00:00:00Z");
+  const startD = new Date(startISO + "T00:00:00Z");
+
+  // Count training sessions from start up to and including targetDate
+  let sessionCount = 0;
+  const cursor = new Date(startD);
+  while (cursor <= targetD) {
+    if (tset.has(cursor.getUTCDay())) sessionCount++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  const week = Math.ceil(sessionCount / daysPerWeek);
+  return week > 0 ? week : 1;
+}
+
+// ─── PUT save weekly entry by date ───────────────────────────────────
+
+router.put("/weekly/by-date/:date", requireAuth, async (req, res) => {
+  try {
+    const dateISO = req.params.date;
+    if (!dateISO.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return res.status(400).json({ error: "Invalid date format (YYYY-MM-DD)" });
+    }
+
+    const week = await resolveWeekFromDate(req.user.id, dateISO, pool, toISODateUTC, trainingDatesForProgramWeek);
+    if (!week) return res.status(400).json({ error: "Could not resolve week from date — no active program?" });
+
+    const payload = req.body || {};
+    const unit = (payload.unit || "kg").toString();
+    const bodyweight = toNum(payload.bodyweight);
+    const sleep_hours = toNum(payload.sleep_hours);
+    const pec_pain_0_10 = payload.pec_pain_0_10 != null ? Number(payload.pec_pain_0_10) : null;
+    const zone2_mins = payload.zone2_mins != null ? Number(payload.zone2_mins) : null;
+    const notes = payload.notes != null ? String(payload.notes) : null;
+    const entries = Array.isArray(payload.entries) ? payload.entries : [];
+
+    const q = await pool.query(
+      `insert into public.weekly_entries_app
+        (user_id, week_number, unit, bodyweight, sleep_hours, pec_pain_0_10, zone2_mins, notes, entries, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())
+       on conflict (user_id, week_number) do update set
+         unit = excluded.unit, bodyweight = excluded.bodyweight,
+         sleep_hours = excluded.sleep_hours, pec_pain_0_10 = excluded.pec_pain_0_10,
+         zone2_mins = excluded.zone2_mins, notes = excluded.notes,
+         entries = excluded.entries, updated_at = now()
+       returning week_number`,
+      [req.user.id, week, unit, bodyweight, sleep_hours, pec_pain_0_10, zone2_mins, notes, JSON.stringify(entries)]
+    );
+
+    res.json({ ok: true, week_number: q.rows[0]?.week_number, resolved_from_date: dateISO });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// ─── POST auto-fill weekly from daily by date ─────────────────────────
+
+router.post("/weekly/from-daily/by-date/:date", requireAuth, async (req, res) => {
+  try {
+    const dateISO = req.params.date;
+    if (!dateISO.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return res.status(400).json({ error: "Invalid date format (YYYY-MM-DD)" });
+    }
+
+    const week = await resolveWeekFromDate(req.user.id, dateISO, pool, toISODateUTC, trainingDatesForProgramWeek);
+    if (!week) return res.status(400).json({ error: "Could not resolve week from date — no active program?" });
+
+    const u = await pool.query(
+      `select active_program_id, tracked_exercises from public.app_users where id = $1`,
+      [req.user.id]
+    );
+    const activeId = u.rows?.[0]?.active_program_id;
+    const tracked = Array.isArray(u.rows?.[0]?.tracked_exercises)
+      ? u.rows[0].tracked_exercises
+      : ["Bench", "Squat", "Deadlift"];
+
+    const p = await pool.query(
+      `select start_date, training_days, days_per_week
+       from public.programs_app where id = $1 and user_id = $2`,
+      [activeId, req.user.id]
+    );
+    const prog = p.rows[0];
+    const startISO = toISODateUTC(new Date(prog.start_date));
+    const trainingDays = Array.isArray(prog.training_days) ? prog.training_days : [];
+    const dates = trainingDatesForProgramWeek(startISO, week, prog.days_per_week, trainingDays);
+
+    if (!dates.length) {
+      return res.json({ ok: true, week_number: week, derived_entries: [], note: "No training dates found." });
+    }
+
+    const from = dates[0];
+    const to = dates[dates.length - 1];
+
+    const dq = await pool.query(
+      `select entry_date, unit, bodyweight, sleep_hours, pec_pain_0_10, zone2_mins, notes, entries
+       from public.daily_entries_app
+       where user_id = $1 and entry_date between $2::date and $3::date
+       order by entry_date asc`,
+      [req.user.id, from, to]
+    );
+
+    const bestByEx = new Map();
+    for (const d of dq.rows || []) {
+      const entries = Array.isArray(d.entries) ? d.entries : [];
+      const iso = toISODateUTC(new Date(d.entry_date));
+      for (const e of entries) {
+        const ex = String(e?.exercise || "").trim();
+        if (!ex || !tracked.includes(ex)) continue;
+        const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+        const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
+        const val = e1rmEpley(top, reps);
+        if (val == null) continue;
+        const cur = bestByEx.get(ex);
+        if (!cur || val > cur.e1rm) bestByEx.set(ex, { e1rm: val, top, reps, rpe: e?.actual?.rpe ?? e?.rpe ?? null, date: iso });
+      }
+    }
+
+    const derivedEntries = tracked.map((ex) => {
+      const b = bestByEx.get(ex);
+      return { exercise: ex, top: b?.top ?? "", reps: b?.reps ?? 3, rpe: b?.rpe ?? "", derived_from: b?.date ?? null };
+    });
+
+    const latest = dq.rows.length ? dq.rows[dq.rows.length - 1] : null;
+    const unit = (req.body?.unit || latest?.unit || "kg").toString();
+    const notes = `Auto-filled from daily logs (${from} → ${to})`;
+
+    const up = await pool.query(
+      `insert into public.weekly_entries_app
+        (user_id, week_number, unit, bodyweight, sleep_hours, pec_pain_0_10, zone2_mins, notes, entries, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,now())
+       on conflict (user_id, week_number) do update set
+         unit = excluded.unit, bodyweight = excluded.bodyweight,
+         sleep_hours = excluded.sleep_hours, pec_pain_0_10 = excluded.pec_pain_0_10,
+         zone2_mins = excluded.zone2_mins, notes = excluded.notes,
+         entries = excluded.entries, updated_at = now()
+       returning week_number`,
+      [req.user.id, week, unit, latest?.bodyweight ?? null, latest?.sleep_hours ?? null,
+       latest?.pec_pain_0_10 ?? null, latest?.zone2_mins ?? null, notes, JSON.stringify(derivedEntries)]
+    );
+
+    res.json({ ok: true, week_number: up.rows?.[0]?.week_number ?? week, date_range: { from, to }, derived_entries: derivedEntries });
+  } catch (e) {
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
 
 module.exports = router;

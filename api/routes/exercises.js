@@ -46,21 +46,27 @@ router.get("/exercises/explorer", requireAuth, async (req, res) => {
 }
 
     // Daily hits
-    for (const row of dailyQ.rows || []) {
-      for (const e of Array.isArray(row.entries) ? row.entries : []) {
-        if (!matchName(e?.exercise)) continue;
-        const top = parseLoadNumber(e?.actual?.top ?? e?.top);
-        const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
-        if (!Number.isFinite(top) || !Number.isFinite(reps) || top <= 0 || reps <= 0) continue;
-        const dateStr = row.entry_date ? String(row.entry_date) : null;
-        hits.push({
-          source: "daily", priority: 3, week: null, date: dateStr,
-          top, reps, rpe: e?.actual?.rpe ?? e?.rpe ?? null,
-          e1rm: e1rmEpley(top, reps),
-          submitted_at_label: formatDateWithWeeksAgo(dateStr),
-        });
-      }
+    const dailyBestByDate = new Map();
+for (const row of dailyQ.rows || []) {
+  const dateStr = row.entry_date ? new Date(row.entry_date).toISOString().slice(0, 10) : null;
+  if (!dateStr) continue;
+  for (const e of Array.isArray(row.entries) ? row.entries : []) {
+    if (!matchName(e?.exercise)) continue;
+    const top = parseLoadNumber(e?.actual?.top ?? e?.top);
+    const reps = parseLoadNumber(e?.actual?.reps ?? e?.reps);
+    if (!Number.isFinite(top) || !Number.isFinite(reps) || top <= 0 || reps <= 0) continue;
+    const e1rm = e1rmEpley(top, reps);
+    const existing = dailyBestByDate.get(dateStr);
+    if (!existing || e1rm > existing.e1rm) {
+      dailyBestByDate.set(dateStr, {
+        source: "daily", priority: 3, week: null, date: dateStr,
+        top, reps, rpe: e?.actual?.rpe ?? e?.rpe ?? null,
+        e1rm, submitted_at_label: formatDateWithWeeksAgo(dateStr),
+      });
     }
+  }
+}
+for (const hit of dailyBestByDate.values()) hits.push(hit);
 
     // Weekly hits
     for (const row of weeklyQ.rows || []) {
@@ -141,7 +147,7 @@ router.get("/exercises/explorer", requireAuth, async (req, res) => {
     const bestLoad = [...validHits].sort((a, b) => (Number(b?.top) || -Infinity) - (Number(a?.top) || -Infinity))[0] || null;
 
     const actualTrend = validHits
-      .filter((h) => h.source === "daily" || h.source === "weekly")
+      .filter((h) => h.source === "daily")
       .sort((a, b) => {
         if (a.date && b.date) return new Date(a.date).getTime() - new Date(b.date).getTime();
         if (!a.date && !b.date) return (Number(a.week) || 0) - (Number(b.week) || 0);
