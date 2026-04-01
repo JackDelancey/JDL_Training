@@ -85,6 +85,8 @@ console.log("ADHERENCE DEBUG", {
   dailyKeys: [...dailyByDate.keys()],
   dates: dates.filter(iso => trainingSet.has(weekdayUTC(iso))),
 });
+
+
     for (const iso of dates) {
       const wd = weekdayUTC(iso);
       if (!trainingSet.has(wd)) continue;
