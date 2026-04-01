@@ -68,25 +68,13 @@ router.get("/adherence/program", requireAuth, async (req, res) => {
       [req.user.id, from, to]
     );
     const dailyByDate = new Map(dQ.rows.map((r) => [
-  String(r.entry_date).slice(0, 10),
+  new Date(r.entry_date).toISOString().slice(0, 10),
   { ...r, entries: Array.isArray(r.entries) ? r.entries : (typeof r.entries === "string" ? JSON.parse(r.entries) : []) }
 ]));
     const dates = eachDateUTC(from, to);
 
     let planned = 0, completed = 0;
     const byWeekMap = new Map();
-console.log("ADHERENCE DEBUG", {
-  startISO,
-  totalSessions,
-  daysPerWeek,
-  trainingDays,
-  from,
-  to,
-  dailyKeys: [...dailyByDate.keys()],
-  dates: dates.filter(iso => trainingSet.has(weekdayUTC(iso))),
-});
-
-
     for (const iso of dates) {
       const wd = weekdayUTC(iso);
       if (!trainingSet.has(wd)) continue;

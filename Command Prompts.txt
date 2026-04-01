@@ -11,6 +11,8 @@ npm run dev
 cd jdl-training-mobile
 npx expo start --clear
 
+npx expo export --platform web
+
 git add .
 git commit -m "fix api issues"
 git push
