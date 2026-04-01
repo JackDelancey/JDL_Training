@@ -75,7 +75,16 @@ router.get("/adherence/program", requireAuth, async (req, res) => {
 
     let planned = 0, completed = 0;
     const byWeekMap = new Map();
-
+console.log("ADHERENCE DEBUG", {
+  startISO,
+  totalSessions,
+  daysPerWeek,
+  trainingDays,
+  from,
+  to,
+  dailyKeys: [...dailyByDate.keys()],
+  dates: dates.filter(iso => trainingSet.has(weekdayUTC(iso))),
+});
     for (const iso of dates) {
       const wd = weekdayUTC(iso);
       if (!trainingSet.has(wd)) continue;
