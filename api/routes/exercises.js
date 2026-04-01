@@ -37,8 +37,16 @@ router.get("/exercises/explorer", requireAuth, async (req, res) => {
         `select id, name, blocks from public.programs_app where user_id=$1 order by created_at desc`,
         [req.user.id]
       ),
-    ]);
 
+    ]);
+const activeProgQ = await pool.query(
+  `select p.start_date, p.training_days, p.days_per_week
+   from public.programs_app p
+   join public.app_users u on u.active_program_id = p.id
+   where u.id = $1`,
+  [req.user.id]
+);
+const activeProg = activeProgQ.rows[0] || null;
     const hits = [];
 
     function matchName(rawName) {
@@ -160,22 +168,43 @@ for (const hit of dailyBestByDate.values()) hits.push(hit);
       const cur = plannedBestByWeek.get(wk);
       if (!cur || Number(h.e1rm) > Number(cur.e1rm)) plannedBestByWeek.set(wk, h);
     }
-
+    function weekNumToISO(weekNum, prog) {
+  if (!prog?.start_date || !Array.isArray(prog.training_days) || !prog.training_days.length) return null;
+  const startD = new Date(new Date(prog.start_date).toISOString().slice(0, 10) + "T00:00:00Z");
+  const tset = new Set(prog.training_days.map(Number));
+  const daysPerWeek = Math.max(1, Number(prog.days_per_week || 4));
+  let sessionCount = 0;
+  for (let i = 0; i < 730; i++) {
+    const d = new Date(startD);
+    d.setUTCDate(startD.getUTCDate() + i);
+    if (tset.has(d.getUTCDay())) {
+      sessionCount++;
+      if (Math.ceil(sessionCount / daysPerWeek) === weekNum) return d.toISOString().slice(0, 10);
+    }
+  }
+  return null;
+}
     const trend_history = [
       ...actualTrend.map((h, idx) => ({
         idx: idx + 1,
-        label: h?.date ? new Date(h.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : h?.week != null ? `W${h.week}` : `Point ${idx + 1}`,
+        label: h?.date ? new Date(h.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : `Point ${idx + 1}`,
         source: h?.source || null, top: h?.top ?? null, reps: h?.reps ?? null,
         e1rm: h?.e1rm ?? null, date: h?.date ?? null, week: h?.week ?? null,
         submitted_at_label: h?.submitted_at_label ?? null,
       })),
-      ...Array.from(plannedBestByWeek.values()).sort((a, b) => Number(a.week) - Number(b.week)).map((h, idx) => ({
-        idx: actualTrend.length + idx + 1,
-        label: h?.week != null ? `W${h.week}` : `Plan ${idx + 1}`,
-        source: "program", top: h?.top ?? null, reps: h?.reps ?? null,
-        e1rm: h?.e1rm ?? null, date: null, week: h?.week ?? null,
-        submitted_at_label: h?.submitted_at_label ?? null,
-      })),
+      ...Array.from(plannedBestByWeek.values()).sort((a, b) => Number(a.week) - Number(b.week)).map((h, idx) => {
+  const isoDate = weekNumToISO(Number(h.week), activeProg);
+  const label = isoDate
+    ? new Date(isoDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
+    : `W${h.week}`;
+  return {
+    idx: actualTrend.length + idx + 1,
+    label,
+    source: "program", top: h?.top ?? null, reps: h?.reps ?? null,
+    e1rm: h?.e1rm ?? null, date: isoDate ?? null, week: h?.week ?? null,
+    submitted_at_label: h?.submitted_at_label ?? null,
+  };
+}),
     ];
 
     res.json({

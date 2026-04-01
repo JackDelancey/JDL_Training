@@ -139,14 +139,28 @@ export default function ExplorerPage() {
   }, [data, curveMetric, showSmooth, showPctDrop, best1rmDisplay, unit]);
 
   const oneRmTrend = useMemo(() => {
-    const rows = Array.isArray(data?.trend_history) ? data.trend_history : [];
-    if (!rows.length) return null;
-    return {
-      labels: rows.map((r) => r.label || "—"),
-      actualSeries: rows.map((r) => (r.source === "daily" || r.source === "weekly") && Number.isFinite(Number(r.e1rm)) ? toDisplayUnit(Number(r.e1rm), unit) : null),
-      plannedSeries: rows.map((r) => r.source === "program" && Number.isFinite(Number(r.e1rm)) ? toDisplayUnit(Number(r.e1rm), unit) : null),
-    };
-  }, [data, unit]);
+  const rows = Array.isArray(data?.trend_history) ? data.trend_history : [];
+  if (!rows.length) return null;
+
+  // Sort all points by date where available, keep source for colouring
+  const sorted = [...rows].sort((a, b) => {
+    const da = a.date || null;
+    const db = b.date || null;
+    if (da && db) return new Date(da).getTime() - new Date(db).getTime();
+    if (!da && !db) return (Number(a.week) || 0) - (Number(b.week) || 0);
+    return da ? -1 : 1;
+  });
+
+  return {
+    labels: sorted.map((r) => r.label || "—"),
+    actualSeries: sorted.map((r) =>
+      (r.source === "daily") && Number.isFinite(Number(r.e1rm)) ? toDisplayUnit(Number(r.e1rm), unit) : null
+    ),
+    plannedSeries: sorted.map((r) =>
+      r.source === "program" && Number.isFinite(Number(r.e1rm)) ? toDisplayUnit(Number(r.e1rm), unit) : null
+    ),
+  };
+}, [data, unit]);
 
   const repPbMatrix = useMemo(() => {
     const map = new Map((data?.best_by_rep_bucket || []).map((r) => [String(r.bucket), r]));

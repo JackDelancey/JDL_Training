@@ -122,9 +122,9 @@ export function Dashboard({ weekly, dailyOverview, unit, tracked, activeProgram 
 
         return (
           <div className="metric" key={ex}>
-            <div className="k">{ex} e1RM (latest)</div>
-            <div className="v">{latestVal != null ? fmt(latestVal) : "—"} <span className="small">{unit}</span></div>
-            <div className="s">Best: {bestVal != null ? `${fmt(bestVal)} ${unit}` : "—"}</div>
+            <div className="k">{ex} e1RM</div>
+<div className="v">{bestVal != null ? fmt(bestVal) : "—"} <span className="small">{unit}</span></div>
+<div className="s">Latest: {latestVal != null ? `${fmt(latestVal)} ${unit}` : "—"}</div>
             <div className="s">Planned W{nextWeek}: {plannedByExercise?.[ex] ?? "—"}</div>
           </div>
         );
