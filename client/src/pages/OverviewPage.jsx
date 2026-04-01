@@ -45,7 +45,7 @@ function AdherenceCard({ token, onInvalidToken }) {
   useEffect(() => {
     if (!token) return;
     apiFetch(`/api/adherence/program?from=${from}&to=${to}`, { token, onInvalidToken })
-      .then(setData).catch(() => setData(null));
+      .then(setData).catch((e) => { console.error("Adherence error:", e); setData(null); });
   }, [token]);
 
   if (!data || data.reason === "no_active_program") return null;
